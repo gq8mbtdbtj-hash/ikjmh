@@ -3,11 +3,22 @@
  * @ingroup tray_hooks_collect
  * @brief Hook 命中事件 + 堆栈采集汇聚（APM / 诊断用）。
  *
- * 与 memprobe 独立：memprobe 做内存域记账；collector 做通用「打点+栈」。
- * 可在同一 proxy 里两者都调。
+ * ## 在架构中的位置
+ * - **memprobe**：按域记账 live/peak（见 @ref memprobe.h）
+ * - **collector**：通用「tag + arg0 + 栈」打点，可接任意 sink / APM
+ * - 同一 proxy 内两者可同时调用；互不替代
  *
- * 降噪：tray_hooks_filter_t / apply_env_filter（进程名、TID、tag、模块、采样）。
+ * ## 数据流（简）
+ * @code{.unparsed}
+ *   record(tag, frames?, n, arg0)
+ *     → 组装 tray_hooks_event_t
+ *     → filter（deny > allow > tid/process/modules/min_arg0/sample）
+ *     → sink 或丢弃（dropped++）
+ * @endcode
  *
+ * 完整说明见 docs/DATAFLOW.md。
+ *
+ * @see tray_hooks_apm_start
  * @see test_collector_unit.cpp
  */
 
@@ -21,6 +32,10 @@ extern "C" {
 
 #include <stdint.h>
 
+/**
+ * @brief 一次采集事件（sink 回调入参）
+ * @note frames 最多 64；超出在 record 侧截断。
+ */
 typedef struct tray_hooks_event {
   int64_t timestamp_ms;       /**< Unix 纪元毫秒 */
   char tag[64];               /**< 如符号名 "malloc" */
@@ -32,12 +47,21 @@ typedef struct tray_hooks_event {
   tray_hooks_frame_t frames[64];
 } tray_hooks_event_t;
 
-/** 用户 sink：勿在回调里长时间持锁；可异步投递 */
+/**
+ * @brief 用户 sink
+ * @warning 勿在回调里长时间持锁或再次 uninit；可异步投递。
+ */
 typedef void (*tray_hooks_sink_fn)(const tray_hooks_event_t* ev, void* user);
 
 /**
- * 过滤规则（全 0 / 空串 = 不限制该项）。
- * allow_* 与 deny_*：逗号分隔；tag 大小写敏感；module 子串匹配栈帧。
+ * @brief 过滤规则（全 0 / 空串 = 不限制该项）
+ *
+ * 判定顺序概念上：
+ * 1. deny_tags 命中 → 丢弃
+ * 2. allow_tags 非空且未命中 → 丢弃
+ * 3. tid / process / modules / min_arg0 / sample_n
+ *
+ * allow_* 与 deny_*：逗号分隔；tag 大小写敏感；module 对栈帧做子串匹配。
  */
 typedef struct tray_hooks_filter {
   const char* allow_tags;     /**< 仅这些 tag；空=全放行 */
@@ -49,20 +73,25 @@ typedef struct tray_hooks_filter {
   unsigned sample_n;          /**< 每 N 次通过 1 次；0/1=全过 */
 } tray_hooks_filter_t;
 
+/** @brief 设置事件 sink；传 NULL 清空（仍会计 total） */
 TRAY_HOOKS_API void tray_hooks_collector_set_sink(tray_hooks_sink_fn sink,
                                                   void* user);
 
-/** 拷贝规则；传 NULL 清空过滤 */
+/** @brief 拷贝规则；传 NULL 清空过滤 */
 TRAY_HOOKS_API void tray_hooks_collector_set_filter(const tray_hooks_filter_t* f);
 
 /**
- * 从环境变量装过滤（可与 set_filter 叠加，env 在 start 时调用即可）：
- *   TRAY_HOOKS_FILTER_TAGS / DENY_TAGS
- *   TRAY_HOOKS_FILTER_TIDS
- *   TRAY_HOOKS_FILTER_PROCESS
- *   TRAY_HOOKS_FILTER_MODULES
- *   TRAY_HOOKS_FILTER_MIN_ARG0
- *   TRAY_HOOKS_FILTER_SAMPLE
+ * @brief 从环境变量装载过滤
+ *
+ * 变量：
+ * - `TRAY_HOOKS_FILTER_TAGS` / `DENY_TAGS`
+ * - `TRAY_HOOKS_FILTER_TIDS`
+ * - `TRAY_HOOKS_FILTER_PROCESS`
+ * - `TRAY_HOOKS_FILTER_MODULES`
+ * - `TRAY_HOOKS_FILTER_MIN_ARG0`
+ * - `TRAY_HOOKS_FILTER_SAMPLE`
+ *
+ * @note 可与 set_filter 叠加；memprobe/APM 启动路径会调用。
  */
 TRAY_HOOKS_API void tray_hooks_collector_apply_env_filter(void);
 
@@ -72,17 +101,17 @@ TRAY_HOOKS_API void tray_hooks_collector_apply_env_filter(void);
  * @param frames  可为 NULL：内部自动 backtrace
  * @param nframes frames 有效长度；frames==NULL 时忽略
  * @param arg0    附加整数（如分配 size）
- * @note 未通过 filter 时不调用 sink，也不计入 total
+ * @note 未通过 filter 时不调用 sink，计入 dropped；通过则 total++。
  */
 TRAY_HOOKS_API void tray_hooks_collector_record(const char* tag,
                                                 const tray_hooks_frame_t* frames,
                                                 int nframes,
                                                 uint64_t arg0);
 
-/** 进程内累计成功 record 次数（含无 sink 时） */
+/** @brief 进程内累计成功 record 次数（含无 sink 时） */
 TRAY_HOOKS_API uint64_t tray_hooks_collector_total(void);
 
-/** 被 filter 丢掉的次数 */
+/** @brief 被 filter 丢掉的次数 */
 TRAY_HOOKS_API uint64_t tray_hooks_collector_dropped(void);
 
 #ifdef __cplusplus
