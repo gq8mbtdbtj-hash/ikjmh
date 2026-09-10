@@ -1,5 +1,6 @@
 /**
  * @file hooks.h
+ * @ingroup tray_hooks_api
  * @brief 跨平台 PLT/IAT hook 门面（API 形态对齐 bytehook / xhook）。
  *
  * 调用顺序：
@@ -12,8 +13,10 @@
  *   - Windows：真 IAT 改写（win_iat_*）
  *   - Android/Linux/OHOS/QNX：自研 ELF GOT/JUMP_SLOT（elf_plt_*）
  *
- * CUSTOMIZE: Android 量产可在 CreateBackend() 内转调 bytehook；
+ * @customize Android 量产可在 CreateBackend() 内转调 bytehook；
  * 此处保持稳定 C ABI，业务与 memprobe 无需改代码。
+ *
+ * @see hook_whitebox.cpp 白盒测试
  */
 
 #pragma once

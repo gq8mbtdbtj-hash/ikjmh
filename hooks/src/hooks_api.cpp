@@ -74,7 +74,12 @@ static tray_hooks_stub_t* Install(tray_hooks::detail::Stub* s) {
     delete s;
     return 0;
   }
-  g_proxy_to_prev[out->new_func] = out->prev_func;
+  // 0 槽重入 hook 时 prev 可能被填成 new_func；勿覆盖已有正确映射（否则 CALL_PREV 死递归）
+  if (out->prev_func && out->prev_func != out->new_func) {
+    g_proxy_to_prev[out->new_func] = out->prev_func;
+  } else if (g_proxy_to_prev.find(out->new_func) == g_proxy_to_prev.end()) {
+    g_proxy_to_prev[out->new_func] = out->prev_func;
+  }
   if (out->hooked) {
     out->hooked(reinterpret_cast<tray_hooks_stub_t*>(out), TRAY_HOOKS_OK,
                 out->caller_path.c_str(), out->sym_name.c_str(), out->new_func,

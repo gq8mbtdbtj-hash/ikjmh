@@ -28,12 +28,27 @@ namespace detail {
 
 namespace {
 
+/** 通过本编译单元内地址反查所在模块；静态链进 EXE 时等于主模块 */
 HMODULE SelfModule() {
   HMODULE m = 0;
   GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
                          GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                      reinterpret_cast<LPCSTR>(&SelfModule), &m);
   return m;
+}
+
+/**
+ * 仅当 hook 引擎位于独立 DLL（如 tray_memprobe.dll）时才跳过自身，
+ * 避免改到探针自己的导入。静态链进 EXE 时不得跳过主模块，否则白盒/进程内
+ * IAT（如对本 EXE 导入的 wb_target）永远 0 命中。
+ */
+HMODULE SkipModuleForPatch() {
+  HMODULE self = SelfModule();
+  HMODULE main_mod = GetModuleHandleW(NULL);
+  if (self && main_mod && self == main_mod) {
+    return 0;
+  }
+  return self;
 }
 
 typedef HMODULE(WINAPI* LoadLibraryA_fn)(LPCSTR);
@@ -103,12 +118,18 @@ public:
     }
     const char* dll =
         stub->callee_path.empty() ? 0 : stub->callee_path.c_str();
-    void* prev = resolve_sym(dll, stub->sym_name.c_str());
-    stub->prev_func = prev ? prev : stub->new_func;
 
     std::vector<iat::Patch> local;
     const int n = iat::PatchAllModules(dll, stub->sym_name.c_str(),
-                                       stub->new_func, &local, SelfModule());
+                                       stub->new_func, &local,
+                                       SkipModuleForPatch());
+    // prev 优先取 IAT 槽里改写前的地址（resolve_sym 对业务 DLL 导出常失败）
+    if (!local.empty() && local[0].original) {
+      stub->prev_func = local[0].original;
+    } else {
+      void* prev = resolve_sym(dll, stub->sym_name.c_str());
+      stub->prev_func = prev ? prev : stub->new_func;
+    }
     {
       std::lock_guard<std::mutex> lock(mu_);
       for (std::size_t i = 0; i < local.size(); ++i) {
@@ -183,7 +204,8 @@ public:
     if (!mod || !automatic_ || refreshing_) {
       return;
     }
-    if (mod == SelfModule()) {
+    // OnModuleLoaded 只处理「新加载」的 DLL；静态链时 SelfModule==EXE，勿误跳过
+    if (mod == SkipModuleForPatch() && SkipModuleForPatch() != 0) {
       return;
     }
     refreshing_ = true;
@@ -221,7 +243,7 @@ public:
 
 private:
   void InstallLoaderHooks() {
-    HMODULE skip = SelfModule();
+    HMODULE skip = SkipModuleForPatch();
     struct Item {
       const char* sym;
       void* proxy;

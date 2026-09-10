@@ -8,7 +8,7 @@
  *  3. proxy 内 CALL_PREV 得到原 1003
  *  4. 命中计数 == 调用次数
  *  5. unhook 后恢复原行为
- *  6. 幂等：重复 hook_all 不崩溃，prev 稳定
+ *  6. 幂等：重复 hook_all 不崩溃
  *
  * @example
  *   cmake --build build --target hook_whitebox
@@ -16,11 +16,9 @@
  */
 
 #include "tray_hooks/hooks.h"
-#include "tray_hooks/collector.h"
 #include "wb_lib.h"
 
 #include <cstdio>
-#include <cstring>
 
 namespace {
 
@@ -42,15 +40,17 @@ typedef int (*wb_fn)(int, int);
 
 int ProxyWbTarget(int a, int b) {
   ++g_proxy_hits;
-  wb_fn prev =
-      reinterpret_cast<wb_fn>(tray_hooks_get_prev(reinterpret_cast<void*>(ProxyWbTarget)));
-  CHECK(prev != 0);
-  CHECK(prev != reinterpret_cast<wb_fn>(ProxyWbTarget));
-  const int orig = prev ? prev(a, b) : -1;
+  wb_fn prev = reinterpret_cast<wb_fn>(
+      tray_hooks_get_prev(reinterpret_cast<void*>(ProxyWbTarget)));
+  if (!prev || prev == reinterpret_cast<wb_fn>(ProxyWbTarget)) {
+    std::fprintf(stderr, "FAIL: invalid prev=%p\n", reinterpret_cast<void*>(prev));
+    ++g_fail;
+    return -1;
+  }
+  const int orig = prev(a, b);
   if (orig == a + b + 1000) {
     ++g_prev_ok;
   }
-  // 故意改返回值，证明调用方走的是 proxy 而非直达 DLL
   return a + b + 2000;
 }
 
@@ -60,14 +60,12 @@ int main() {
   std::printf("=== hook_whitebox ===\n");
   std::printf("wb_lib_version=%s\n", wb_lib_version());
 
-  // 1) 基线
   const int base = wb_target(1, 2);
   CHECK(base == 1003);
 
   CHECK(tray_hooks_init(TRAY_HOOKS_MODE_AUTOMATIC) == TRAY_HOOKS_OK);
   std::printf("backend=%s\n", tray_hooks_backend_name());
 
-  // 2) hook：不限 callee DLL（Win 上导入名可能是 tray_wb_lib.dll）
   tray_hooks_stub_t* stub = tray_hooks_hook_all(
       NULL, "wb_target", reinterpret_cast<void*>(ProxyWbTarget), NULL, NULL);
   CHECK(stub != 0);
@@ -79,37 +77,22 @@ int main() {
   CHECK(g_proxy_hits == 1);
   CHECK(g_prev_ok == 1);
 
-  // 3) 多次调用
   for (int i = 0; i < 5; ++i) {
     CHECK(wb_target(3, 4) == 2007);
   }
   CHECK(g_proxy_hits == 6);
 
-  // 4) 幂等再 hook（不应炸；可能增加 0 槽）
   tray_hooks_stub_t* stub2 = tray_hooks_hook_all(
       NULL, "wb_target", reinterpret_cast<void*>(ProxyWbTarget), NULL, NULL);
   CHECK(stub2 != 0);
   CHECK(wb_target(0, 0) == 2000);
 
-  // 5) unhook 第一个 stub 后，若 stub2 仍在则可能仍 hook；全部 unhook
   CHECK(tray_hooks_unhook(stub) == TRAY_HOOKS_OK);
   CHECK(tray_hooks_unhook(stub2) == TRAY_HOOKS_OK);
 
-  // 6) 恢复
   const int restored = wb_target(1, 2);
   CHECK(restored == 1003);
 
-  tray_hooks_uninit();
-
-  // 7) collector 与 whitebox 联调（过滤）
-  tray_hooks_init(TRAY_HOOKS_MODE_MANUAL);
-  int hits = 0;
-  tray_hooks_collector_set_sink(
-      [](const tray_hooks_event_t*, void* u) {
-        *static_cast<int*>(u) += 1;
-      },
-      &hits);
-  // C++11 lambda→fnptr 若编译器不支持，上面会挂；改用手动
   tray_hooks_uninit();
 
   if (g_fail) {

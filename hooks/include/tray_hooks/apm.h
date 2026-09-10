@@ -1,5 +1,6 @@
 /**
  * @file apm.h
+ * @ingroup tray_hooks_collect
  * @brief Collector → 持续观测：NDJSON 落盘 / HTTP POST 批量上报。
  *
  * 环境变量（tray_hooks_apm_start_from_env）：
@@ -10,6 +11,8 @@
  *   TRAY_HOOKS_APM_STACKS=0             不上报 stacks（降噪/带宽）
  *
  * 与过滤配合：先 tray_hooks_collector_apply_env_filter()，再 start APM。
+ *
+ * @see test_apm_unit.cpp
  */
 
 #pragma once

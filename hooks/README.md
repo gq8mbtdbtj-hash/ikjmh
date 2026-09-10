@@ -74,6 +74,27 @@ cmake -S hooks -B build_hooks \
   -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24
 ```
 
+## 测试与文档
+
+```bash
+# 单元自测 + 白盒 hook
+cmake --build build --target hooks_unit_tests hooks_apm_tests hook_whitebox
+ctest --test-dir build -R "hooks_|hook_whitebox" --output-on-failure
+# 或直接:
+./build/hooks/hooks_unit_tests
+./build/hooks/hooks_apm_tests
+./build/hooks/hook_whitebox
+
+# Doxygen（hooks 专用，含 mainpage / ROADMAP）
+cd hooks && doxygen Doxyfile
+# 输出: hooks/docs/doxygen/html/index.html
+```
+
+白盒程序 `hook_whitebox`：自建 `tray_wb_lib` 导出 `wb_target`，验证真 IAT/PLT 拦截、
+`CALL_PREV`、unhook 恢复与重复 hook 幂等。
+
+后续方向见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+
 ## 对接生产后端
 
 | 目标 | 建议 |

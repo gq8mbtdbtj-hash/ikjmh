@@ -1,5 +1,6 @@
 /**
  * @file memprobe.h
+ * @ingroup tray_memprobe_api
  * @brief 无编译注入采集：堆 / mmap / 扩展域内存 + CPU + 调用栈。
  *
  * ## 注入方式（不改业务工程源码）
@@ -24,6 +25,9 @@
  * GPU 默认精确 hook：cuMemAlloc(_v2)/cudaMalloc/clCreateBuffer/vkAllocateMemory
  *（及对应 free），按 ABI 记真实 size。TRAY_MEMPROBE_GPU_SYMS 额外符号为占位 ABI。
  * NPU/NEON 仍为占位或 domain_alloc/free。
+ *
+ * @see memprobe_smoke.cpp
+ * @see hooks/docs/ROADMAP.md
  */
 
 #pragma once

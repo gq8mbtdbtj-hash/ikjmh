@@ -1,11 +1,14 @@
 /**
  * @file collector.h
+ * @ingroup tray_hooks_collect
  * @brief Hook 命中事件 + 堆栈采集汇聚（APM / 诊断用）。
  *
  * 与 memprobe 独立：memprobe 做内存域记账；collector 做通用「打点+栈」。
  * 可在同一 proxy 里两者都调。
  *
  * 降噪：tray_hooks_filter_t / apply_env_filter（进程名、TID、tag、模块、采样）。
+ *
+ * @see test_collector_unit.cpp
  */
 
 #pragma once
