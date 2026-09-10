@@ -1,0 +1,61 @@
+# API 路由 ACL（配置优先；也可用 /admin 后台改写本文件）
+#
+# CUSTOMIZE: 按业务接口细分 roles。同 id 的条目以本文件为准；
+# 各 module 的 DefaultACL() 仅在「缺少 id」时合并进来（见 framework.ACLProvider）。
+# path 支持尾缀 *；method 为大写或 *。
+
+version: 1
+
+routes:
+  # ---- framework / auth（也可由 auth.DefaultACL 补齐）----
+  - id: health
+    method: GET
+    path: /api/v1/health
+    public: true
+
+  - id: login
+    method: POST
+    path: /api/v1/login
+    public: true
+
+  # ---- adminui ----
+  - id: admin_ui
+    method: GET
+    path: /admin
+    public: true
+
+  - id: admin_ui_slash
+    method: GET
+    path: /admin/
+    public: true
+
+  - id: admin_api
+    method: "*"
+    path: /api/v1/admin/*
+    roles: [admin]
+
+  # ---- catalog（业务；新产品可删本节，改由 module DefaultACL 注入）----
+  - id: config_read
+    method: GET
+    path: /api/v1/config.json
+    roles: [admin, ops, viewer]
+
+  - id: config_write
+    method: PUT
+    path: /api/v1/config.json
+    roles: [admin, ops]
+
+  - id: config_write_post
+    method: POST
+    path: /api/v1/config.json
+    roles: [admin, ops]
+
+  - id: update_manifest
+    method: GET
+    path: /api/v1/update/manifest
+    roles: [admin, ops, viewer]
+
+  - id: files_get
+    method: GET
+    path: /api/v1/files/*
+    roles: [admin, ops, viewer]

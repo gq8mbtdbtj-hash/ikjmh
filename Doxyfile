@@ -1,0 +1,23 @@
+# Doxyfile — 最小配置，生成 API + CUSTOMIZE 定制说明
+PROJECT_NAME           = "tray_demo"
+PROJECT_BRIEF          = "Cross-platform tray framework (C++11)"
+OUTPUT_DIRECTORY       = docs/doxygen
+CREATE_SUBDIRS         = NO
+OUTPUT_LANGUAGE        = Chinese
+INPUT                  = include/tray_demo src/app/main.cpp src/core
+FILE_PATTERNS          = *.hpp *.h *.cpp
+RECURSIVE              = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+HAVE_DOT               = NO
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+# 自定义命令：注释里写 @customize 文案 → 文档中显示为醒目段落
+ALIASES               += customize{1}="\par \b CUSTOMIZE:\n\1"
+ALIASES               += platform{1}="\par \b PLATFORM:\n\1"
+ALIASES               += internal{1}="\par \b INTERNAL:\n\1"
+WARN_IF_UNDOCUMENTED   = NO
+QUIET                  = YES

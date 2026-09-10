@@ -1,0 +1,116 @@
+# =============================================================================
+# tray_demo .gitignore
+# =============================================================================
+
+# ---- Build / CMake / Ninja ----
+/build/
+/build_*/
+/cmake-build-*/
+/out/
+/Debug/
+/Release/
+/x64/
+/Win32/
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+*.ninja
+.ninja_deps
+.ninja_log
+build.ninja
+.cmake/
+
+# ---- C/C++ / MSVC 产物 ----
+*.obj
+*.o
+*.a
+*.pdb
+*.ilk
+*.idb
+*.ipdb
+*.iobj
+*.exp
+*.map
+*.exe
+*.dll
+*.lib
+*.so
+*.dylib
+*.app
+
+# 保留 third_party 预置库（pthreads / WebView2 loader）
+!third_party/**/
+!third_party/**/*.lib
+!third_party/**/*.dll
+!third_party/**/*.h
+!third_party/**/*.hpp
+
+# ---- WebView2 NuGet 解压残留 ----
+third_party/webview2/pkg/
+third_party/webview2/*.zip
+third_party/webview2/*.nupkg
+
+# ---- Go server ----
+server/tray_demo_server
+server/tray_demo_server.exe
+server/*.exe
+server/*.exe~
+server/data/
+*.test
+*.out
+
+# ---- 文档生成 ----
+/docs/doxygen/
+/docs/html/
+/docs/latex/
+/docs/xml/
+
+# ---- IDE / 编辑器 ----
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.user
+*.userosscache
+*.suo
+*.ncb
+*.aps
+*.opendb
+*.VC.db
+*.VC.opendb
+*~
+*.swp
+*.swo
+.clangd/
+.cache/
+
+# ---- OS ----
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---- 本地 / 敏感 ----
+.env
+.env.*
+!.env.example
+*.local
+secrets.*
+credentials.*
+
+# ---- 杂项 ----
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej

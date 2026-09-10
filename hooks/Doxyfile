@@ -1,0 +1,29 @@
+# Doxyfile for tray_hooks / tray_memprobe
+PROJECT_NAME           = "tray_hooks"
+PROJECT_BRIEF          = "Cross-platform IAT/PLT hooks, memprobe, APM"
+OUTPUT_DIRECTORY       = docs/doxygen
+CREATE_SUBDIRS         = NO
+OUTPUT_LANGUAGE        = Chinese
+INPUT                  = include/tray_hooks src docs/mainpage.dox docs/PLATFORM.md memprobe/README.md
+FILE_PATTERNS          = *.hpp *.h *.cpp *.dox *.md
+RECURSIVE              = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+HAVE_DOT               = NO
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+USE_MDFILE_AS_MAINPAGE =
+ALIASES               += customize{1}="\par \b CUSTOMIZE:\n\1"
+ALIASES               += platform{1}="\par \b PLATFORM:\n\1"
+ALIASES               += internal{1}="\par \b INTERNAL:\n\1"
+WARN_IF_UNDOCUMENTED   = NO
+QUIET                  = YES
+SHOW_FILES             = YES
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = NO
+EXAMPLE_PATH           = examples tests
+EXAMPLE_PATTERNS       = *.cpp

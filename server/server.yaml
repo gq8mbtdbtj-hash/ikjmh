@@ -1,0 +1,46 @@
+# tray_demo 统一服务配置（优先于环境变量 / CLI）
+#
+# CUSTOMIZE: 改本文件即可，不必改代码。
+# 启动：go run .          （默认读 ./server.yaml）
+#       go run . -config my.yaml
+#
+# Gin + JWT + ACL；管理后台：http://127.0.0.1:8080/admin/
+
+listen: ":8080"
+auth_mode: mock          # mock | ldap
+data_dir: ./data
+acl_file: ./acl.yaml     # 路由权限表（可被 /admin 编辑）
+
+ldap:
+  url: "ldap://127.0.0.1:389"
+  base_dn: "dc=example,dc=com"
+  user_dn_format: "uid=%s,ou=people,dc=example,dc=com"
+
+# auth_mode=mock 时使用；生产请改为 ldap
+# CUSTOMIZE: 按业务账号分配 roles（须在 acl.yaml 中有对应权限）
+mock:
+  users:
+    - username: demo
+      password: demo
+      roles: [viewer]
+    - username: ops
+      password: ops
+      roles: [ops]
+    - username: admin
+      password: admin
+      roles: [admin]
+
+# LDAP 登录成功后的默认角色（可按用户名覆盖）
+role_map:
+  default: [viewer]
+  # admin_user: [admin]
+
+cors:
+  allow_origin: "*"
+
+token:
+  ttl_hours: 12
+  # CUSTOMIZE: 生产务必换成长随机串
+  jwt_secret: "tray_demo_dev_secret_change_me"
+  # 登录签发时写入 client IP；校验时比对（反代需可信 X-Forwarded-For）
+  bind_client_ip: true
