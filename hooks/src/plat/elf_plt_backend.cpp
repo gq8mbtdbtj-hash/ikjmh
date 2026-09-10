@@ -101,13 +101,26 @@ public:
     void* prev = resolve_sym(
         stub->callee_path.empty() ? 0 : stub->callee_path.c_str(),
         stub->sym_name.c_str());
-    stub->prev_func = prev ? prev : stub->new_func;
 
     const char* caller =
         stub->caller_path.empty() ? 0 : stub->caller_path.c_str();
+    int (*allow_fn)(const char*, void*) = 0;
+    void* allow_arg = 0;
+    if (stub->scope == 1 && stub->caller_allow) {
+      allow_fn = stub->caller_allow;
+      allow_arg = stub->caller_allow_arg;
+    }
+
     std::vector<elfplt::Patch> local;
+    int fails = 0;
     const int n = elfplt::PatchSymbol(caller, stub->sym_name.c_str(),
-                                      stub->new_func, &local);
+                                      stub->new_func, &local, allow_fn,
+                                      allow_arg, &fails);
+    if (!local.empty() && local[0].original) {
+      stub->prev_func = local[0].original;
+    } else {
+      stub->prev_func = prev ? prev : stub->new_func;
+    }
     {
       std::lock_guard<std::mutex> lock(mu_);
       for (std::size_t i = 0; i < local.size(); ++i) {
@@ -117,8 +130,9 @@ public:
       active_.push_back(stub);
     }
     std::fprintf(stderr,
-                 "[tray_hooks] %s: hooked '%s' in %d GOT slot(s)\n", name(),
-                 stub->sym_name.c_str(), n);
+                 "[tray_hooks] %s: hooked '%s' in %d GOT slot(s) "
+                 "(scope=%d fails=%d)\n",
+                 name(), stub->sym_name.c_str(), n, stub->scope, fails);
     return stub;
   }
 
@@ -180,9 +194,15 @@ public:
       }
       const char* caller =
           s->caller_path.empty() ? 0 : s->caller_path.c_str();
+      int (*allow_fn)(const char*, void*) = 0;
+      void* allow_arg = 0;
+      if (s->scope == 1 && s->caller_allow) {
+        allow_fn = s->caller_allow;
+        allow_arg = s->caller_allow_arg;
+      }
       std::vector<elfplt::Patch> local;
       total += elfplt::PatchSymbol(caller, s->sym_name.c_str(), s->new_func,
-                                   &local);
+                                   &local, allow_fn, allow_arg, 0);
       if (!local.empty()) {
         std::lock_guard<std::mutex> lock(mu_);
         for (std::size_t j = 0; j < local.size(); ++j) {

@@ -32,7 +32,10 @@ struct Stub {
   void* prev_func;          /**< 改写前原实现，供 tray_hooks_get_prev */
   tray_hooks_hooked_t hooked; /**< 可选完成回调 */
   void* hooked_arg;
-  int scope;  /**< 0=single 1=partial 2=all（目前后端对 all 等同全模块扫描） */
+  int scope;  /**< 0=single 1=partial 2=all */
+  /** partial：非空时按模块路径回调过滤（返回非 0=允许改写） */
+  int (*caller_allow)(const char* caller_path, void* arg);
+  void* caller_allow_arg;
 };
 
 /** 平台后端虚接口：init/hook/unhook/resolve */

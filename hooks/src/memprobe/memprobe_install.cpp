@@ -202,6 +202,7 @@ void HookSymList(const char* list, void* proxy) {
  */
 void HookGpuNpuFromEnv() {
   tray_memprobe::gpu::InstallPreciseGpuHooks();
+  tray_memprobe::npu::InstallPreciseNpuHooks();
 
   const char* gpu = std::getenv("TRAY_MEMPROBE_GPU_SYMS");
   if (tray_memprobe::detail::DomainEnabled(TRAY_MEM_GPU) && gpu && *gpu) {
@@ -221,7 +222,7 @@ void HookGpuNpuFromEnv() {
 
 }  // namespace
 
-extern "C" void tray_memprobe_install_hooks(void) {
+extern "C" TRAY_MEMPROBE_API void tray_memprobe_install_hooks(void) {
   // 必须先 init：后续 HookOne → Backend::hook
   if (tray_hooks_init(TRAY_HOOKS_MODE_AUTOMATIC) != TRAY_HOOKS_OK) {
     return;

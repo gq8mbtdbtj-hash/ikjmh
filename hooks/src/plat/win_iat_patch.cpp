@@ -70,6 +70,149 @@ bool WriteSlot(void** slot, void* value) {
   return true;
 }
 
+int PatchOneThunkChain(HMODULE caller,
+                       const char* dll_name,
+                       const char* import_dll,
+                       const char* sym_name,
+                       void* new_fn,
+                       IMAGE_THUNK_DATA* thunk,
+                       IMAGE_THUNK_DATA* iat,
+                       std::vector<Patch>* out_patches) {
+  if (!DllMatch(import_dll, dll_name) || !thunk || !iat) {
+    return 0;
+  }
+  int count = 0;
+  for (; thunk->u1.AddressOfData; ++thunk, ++iat) {
+    if (IMAGE_SNAP_BY_ORDINAL(thunk->u1.Ordinal)) {
+      continue;
+    }
+    auto* ibn = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(
+        reinterpret_cast<BYTE*>(caller) + thunk->u1.AddressOfData);
+    if (!ibn->Name ||
+        std::strcmp(reinterpret_cast<const char*>(ibn->Name), sym_name) != 0) {
+      continue;
+    }
+    void** slot = reinterpret_cast<void**>(&iat->u1.Function);
+    void* original = *slot;
+    if (original == new_fn) {
+      continue;
+    }
+    if (!WriteSlot(slot, new_fn)) {
+      continue;
+    }
+    if (out_patches) {
+      Patch p;
+      p.slot = slot;
+      p.original = original;
+      p.replaced = new_fn;
+      p.caller = caller;
+      p.dll_name = dll_name;
+      p.sym_name = sym_name;
+      out_patches->push_back(p);
+    }
+    ++count;
+  }
+  return count;
+}
+
+/** Delay-Load 描述符（与 ImageHlp / VC 延迟加载兼容的精简布局） */
+struct DelayDescr {
+  DWORD attributes;
+  DWORD rvaDLLName;
+  DWORD rvaHmod;
+  DWORD rvaIAT;
+  DWORD rvaINT;
+  DWORD rvaBoundIAT;
+  DWORD rvaUnloadIAT;
+  DWORD dwTimeStamp;
+};
+
+int PatchDelayImports(HMODULE caller,
+                      const char* import_dll,
+                      const char* sym_name,
+                      void* new_fn,
+                      IMAGE_NT_HEADERS* nt,
+                      std::vector<Patch>* out_patches) {
+  IMAGE_DATA_DIRECTORY dir =
+      nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT];
+  if (!dir.VirtualAddress || !dir.Size) {
+    return 0;
+  }
+  auto* base = reinterpret_cast<BYTE*>(caller);
+  auto* d = reinterpret_cast<DelayDescr*>(base + dir.VirtualAddress);
+  auto* dend = reinterpret_cast<DelayDescr*>(base + dir.VirtualAddress + dir.Size);
+  int count = 0;
+  for (; d + 1 <= dend && d->rvaDLLName; ++d) {
+    if (d->rvaDLLName >= nt->OptionalHeader.SizeOfImage ||
+        d->rvaIAT >= nt->OptionalHeader.SizeOfImage ||
+        d->rvaINT >= nt->OptionalHeader.SizeOfImage) {
+      break;
+    }
+    const char* dll_name =
+        reinterpret_cast<const char*>(base + d->rvaDLLName);
+    if (!DllMatch(import_dll, dll_name)) {
+      continue;
+    }
+    auto* iat = reinterpret_cast<IMAGE_THUNK_DATA*>(base + d->rvaIAT);
+    auto* thunk = reinterpret_cast<IMAGE_THUNK_DATA*>(base + d->rvaINT);
+    for (; thunk->u1.AddressOfData; ++thunk, ++iat) {
+      if (IMAGE_SNAP_BY_ORDINAL(thunk->u1.Ordinal)) {
+        continue;
+      }
+      auto* ibn = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(
+          base + thunk->u1.AddressOfData);
+      if (!ibn->Name ||
+          std::strcmp(reinterpret_cast<const char*>(ibn->Name), sym_name) !=
+              0) {
+        continue;
+      }
+      void** slot = reinterpret_cast<void**>(&iat->u1.Function);
+      void* original = *slot;
+      if (original == new_fn) {
+        continue;
+      }
+      // 未绑定的 delay IAT 仍指向本模块内 helper；改写会炸栈，跳过
+      HMODULE owner = 0;
+      if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                 GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                             reinterpret_cast<LPCSTR>(original), &owner) &&
+          owner == caller) {
+        continue;
+      }
+      if (!WriteSlot(slot, new_fn)) {
+        continue;
+      }
+      if (out_patches) {
+        Patch p;
+        p.slot = slot;
+        p.original = original;
+        p.replaced = new_fn;
+        p.caller = caller;
+        p.dll_name = dll_name;
+        p.sym_name = sym_name;
+        out_patches->push_back(p);
+      }
+      ++count;
+    }
+  }
+  return count;
+}
+
+std::string ModulePathUtf8(HMODULE mod) {
+  wchar_t wpath[MAX_PATH];
+  DWORD n = GetModuleFileNameW(mod, wpath, MAX_PATH);
+  if (!n) {
+    return std::string();
+  }
+  int need = WideCharToMultiByte(CP_UTF8, 0, wpath, -1, 0, 0, 0, 0);
+  if (need <= 1) {
+    return std::string();
+  }
+  std::string out(static_cast<size_t>(need - 1), '\0');
+  WideCharToMultiByte(CP_UTF8, 0, wpath, -1, &out[0], need, 0, 0);
+  return out;
+}
+
 }  // namespace
 
 int PatchModule(HMODULE caller,
@@ -91,63 +234,26 @@ int PatchModule(HMODULE caller,
     return 0;
   }
 
+  int count = 0;
   IMAGE_DATA_DIRECTORY dir =
       nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-  if (!dir.VirtualAddress || !dir.Size) {
-    return 0;  // 无线导入表（少见，或纯资源模块）
-  }
-
-  auto* imp = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(
-      reinterpret_cast<BYTE*>(caller) + dir.VirtualAddress);
-  int count = 0;
-
-  for (; imp->Name; ++imp) {
-    const char* dll_name = reinterpret_cast<const char*>(
-        reinterpret_cast<BYTE*>(caller) + imp->Name);
-    if (!DllMatch(import_dll, dll_name)) {
-      continue;
-    }
-
-    // INT：导入名称表；IAT：实际跳转使用的地址表（运行期可被绑定器改写）
-    auto* thunk = reinterpret_cast<IMAGE_THUNK_DATA*>(
-        reinterpret_cast<BYTE*>(caller) +
-        (imp->OriginalFirstThunk ? imp->OriginalFirstThunk : imp->FirstThunk));
-    auto* iat = reinterpret_cast<IMAGE_THUNK_DATA*>(
-        reinterpret_cast<BYTE*>(caller) + imp->FirstThunk);
-
-    for (; thunk->u1.AddressOfData; ++thunk, ++iat) {
-      // 按序号导入的项没有名称，本实现跳过
-      if (IMAGE_SNAP_BY_ORDINAL(thunk->u1.Ordinal)) {
-        continue;
-      }
-      auto* ibn = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(
-          reinterpret_cast<BYTE*>(caller) + thunk->u1.AddressOfData);
-      if (!ibn->Name || std::strcmp(reinterpret_cast<const char*>(ibn->Name),
-                                    sym_name) != 0) {
-        continue;
-      }
-
-      void** slot = reinterpret_cast<void**>(&iat->u1.Function);
-      void* original = *slot;
-      if (original == new_fn) {
-        continue;  // 已 hook，避免重复写
-      }
-      if (!WriteSlot(slot, new_fn)) {
-        continue;
-      }
-      if (out_patches) {
-        Patch p;
-        p.slot = slot;
-        p.original = original;
-        p.replaced = new_fn;
-        p.caller = caller;
-        p.dll_name = dll_name;
-        p.sym_name = sym_name;
-        out_patches->push_back(p);
-      }
-      ++count;
+  if (dir.VirtualAddress && dir.Size) {
+    auto* imp = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(
+        reinterpret_cast<BYTE*>(caller) + dir.VirtualAddress);
+    for (; imp->Name; ++imp) {
+      const char* dll_name = reinterpret_cast<const char*>(
+          reinterpret_cast<BYTE*>(caller) + imp->Name);
+      auto* thunk = reinterpret_cast<IMAGE_THUNK_DATA*>(
+          reinterpret_cast<BYTE*>(caller) +
+          (imp->OriginalFirstThunk ? imp->OriginalFirstThunk : imp->FirstThunk));
+      auto* iat = reinterpret_cast<IMAGE_THUNK_DATA*>(
+          reinterpret_cast<BYTE*>(caller) + imp->FirstThunk);
+      count += PatchOneThunkChain(caller, dll_name, import_dll, sym_name, new_fn,
+                                  thunk, iat, out_patches);
     }
   }
+  count += PatchDelayImports(caller, import_dll, sym_name, new_fn, nt,
+                             out_patches);
   return count;
 }
 
@@ -155,12 +261,19 @@ int PatchAllModules(const char* import_dll,
                     const char* sym_name,
                     void* new_fn,
                     std::vector<Patch>* out_patches,
-                    HMODULE skip_self) {
-  // Toolhelp 枚举；失败时至少尝试主模块
+                    HMODULE skip_self,
+                    int (*allow)(const char* caller_path, void* arg),
+                    void* allow_arg) {
   HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
                                          GetCurrentProcessId());
   if (snap == INVALID_HANDLE_VALUE) {
     HMODULE main_mod = GetModuleHandleW(NULL);
+    if (allow) {
+      std::string path = ModulePathUtf8(main_mod);
+      if (!allow(path.c_str(), allow_arg)) {
+        return 0;
+      }
+    }
     return PatchModule(main_mod, import_dll, sym_name, new_fn, out_patches);
   }
 
@@ -172,7 +285,14 @@ int PatchAllModules(const char* import_dll,
       if (skip_self && me.hModule == skip_self) {
         continue;
       }
-      total += PatchModule(me.hModule, import_dll, sym_name, new_fn, out_patches);
+      if (allow) {
+        std::string path = ModulePathUtf8(me.hModule);
+        if (!allow(path.c_str(), allow_arg)) {
+          continue;
+        }
+      }
+      total +=
+          PatchModule(me.hModule, import_dll, sym_name, new_fn, out_patches);
     } while (Module32NextW(snap, &me));
   }
   CloseHandle(snap);

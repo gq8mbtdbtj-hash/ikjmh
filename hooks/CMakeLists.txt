@@ -54,6 +54,7 @@ if(TRAY_HOOKS_BUILD_MEMPROBE)
     src/memprobe/memprobe_tracker.cpp
     src/memprobe/memprobe_install.cpp
     src/memprobe/memprobe_gpu.cpp
+    src/memprobe/memprobe_npu.cpp
     src/memprobe/memprobe_init.cpp
   )
   if(NOT WIN32)
@@ -125,9 +126,21 @@ if(TRAY_HOOKS_BUILD_TESTS)
   endif()
   set_target_properties(tray_wb_lib PROPERTIES OUTPUT_NAME "tray_wb_lib")
 
+  add_library(tray_wb_late SHARED tests/wb_late.cpp)
+  target_include_directories(tray_wb_late PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+  target_link_libraries(tray_wb_late PRIVATE tray_wb_lib)
+  if(NOT WIN32)
+    target_compile_options(tray_wb_late PRIVATE -fvisibility=hidden)
+  endif()
+  if(MSVC)
+    target_compile_options(tray_wb_late PRIVATE /utf-8)
+  endif()
+  set_target_properties(tray_wb_late PROPERTIES OUTPUT_NAME "tray_wb_late")
+
   add_executable(hook_whitebox examples/hook_whitebox.cpp)
   target_include_directories(hook_whitebox PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_link_libraries(hook_whitebox PRIVATE tray_hooks tray_wb_lib)
+  add_dependencies(hook_whitebox tray_wb_late)
   if(MSVC)
     target_compile_options(hook_whitebox PRIVATE /utf-8)
   endif()
@@ -136,4 +149,7 @@ if(TRAY_HOOKS_BUILD_TESTS)
   add_test(NAME hooks_unit_tests COMMAND hooks_unit_tests)
   add_test(NAME hooks_apm_tests COMMAND hooks_apm_tests)
   add_test(NAME hook_whitebox COMMAND hook_whitebox)
+  # 保证测试工作目录能 LoadLibrary 到 late DLL
+  set_tests_properties(hook_whitebox PROPERTIES
+    WORKING_DIRECTORY $<TARGET_FILE_DIR:hook_whitebox>)
 endif()

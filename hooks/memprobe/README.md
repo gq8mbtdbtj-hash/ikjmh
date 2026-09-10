@@ -79,7 +79,7 @@ PE 持久依赖可用：
 | `TRAY_HOOKS_FILTER_MIN_ARG0` | 最小 size |
 | `TRAY_HOOKS_FILTER_SAMPLE` | 事件采样 N |
 | `TRAY_MEMPROBE_GPU_SYMS` | 额外 GPU 符号（占位 ABI，size=0）；精确符号见下表默认已装 |
-| `TRAY_MEMPROBE_NPU_SYMS` | NPU runtime 符号列表（必填才 hook） |
+| `TRAY_MEMPROBE_NPU_SYMS` | 额外 NPU 占位符号；默认已装 Ascend `aclrtMalloc/Free` |
 | `TRAY_MEMPROBE_NEON_SYMS` | 自定义/加速缓冲符号（neno→neon） |
 
 ### 持续观测示例

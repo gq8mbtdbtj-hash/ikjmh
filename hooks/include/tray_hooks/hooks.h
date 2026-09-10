@@ -98,8 +98,9 @@ TRAY_HOOKS_API tray_hooks_stub_t* tray_hooks_hook_single(
     void* hooked_arg);
 
 /**
- * @brief 按 caller 白名单 hook（当前实现回退为 hook_all）
- * @param caller_allow 返回非 0 表示允许该 caller_path
+ * @brief 按 caller 白名单 hook
+ * @param caller_allow 返回非 0 表示允许改写该 caller 模块；不可为 NULL
+ * @note 真正按模块过滤（不再回退为 hook_all）
  */
 TRAY_HOOKS_API tray_hooks_stub_t* tray_hooks_hook_partial(
     int (*caller_allow)(const char* caller_path, void* arg),

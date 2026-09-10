@@ -34,4 +34,9 @@ namespace gpu {
 void InstallPreciseGpuHooks();
 }  // namespace gpu
 
+namespace npu {
+/** 安装 Ascend ACL 等精确尺寸 hook */
+void InstallPreciseNpuHooks();
+}  // namespace npu
+
 }  // namespace tray_memprobe

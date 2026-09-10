@@ -2,8 +2,8 @@
  * @file win_iat_backend.cpp
  * @brief tray_hooks 的 Windows 后端：真 IAT 改写 + AUTOMATIC 晚加载补 hook。
  *
- * AUTOMATIC：在 init 时 hook LoadLibrary(A|W|ExA|ExW)；新模块加载成功后，
- * 对其 IAT 重放所有仍活跃的用户 stub（已 hook 槽位会被跳过）。
+ * AUTOMATIC（首选）：LdrRegisterDllNotification（ntdll），新 DLL 加载后对其 IAT
+ * 重放活跃 stub。回退：IAT hook LoadLibrary*（易与 CRT 重入，可用环境变量关闭）。
  */
 
 #include "internal/backend.hpp"
@@ -16,8 +16,11 @@
 #include <windows.h>
 
 #include <cstdio>
+#include <cctype>
+#include <cstdlib>
 #include <map>
 #include <mutex>
+#include <string>
 #include <vector>
 #endif
 
@@ -61,7 +64,67 @@ LoadLibraryW_fn g_real_LLW = 0;
 LoadLibraryExA_fn g_real_LLEA = 0;
 LoadLibraryExW_fn g_real_LLEW = 0;
 
+// ---- ntdll LdrRegisterDllNotification（AUTOMATIC 首选，避免 IAT hook LoadLibrary）----
+#ifndef LDR_DLL_NOTIFICATION_REASON_LOADED
+#define LDR_DLL_NOTIFICATION_REASON_LOADED 1
+#endif
+
+typedef struct _TRAY_UNICODE_STRING {
+  USHORT Length;
+  USHORT MaximumLength;
+  PWSTR Buffer;
+} TRAY_UNICODE_STRING;
+
+typedef struct _TRAY_LDR_DLL_LOADED_NOTIFICATION_DATA {
+  ULONG Flags;
+  const TRAY_UNICODE_STRING* FullDllName;
+  const TRAY_UNICODE_STRING* BaseDllName;
+  PVOID DllBase;
+  ULONG SizeOfImage;
+} TRAY_LDR_DLL_LOADED_NOTIFICATION_DATA;
+
+typedef union _TRAY_LDR_DLL_NOTIFICATION_DATA {
+  TRAY_LDR_DLL_LOADED_NOTIFICATION_DATA Loaded;
+  TRAY_LDR_DLL_LOADED_NOTIFICATION_DATA Unloaded;
+} TRAY_LDR_DLL_NOTIFICATION_DATA;
+
+typedef VOID(NTAPI* PFN_LdrDllNotification)(
+    ULONG NotificationReason,
+    const TRAY_LDR_DLL_NOTIFICATION_DATA* NotificationData,
+    PVOID Context);
+
+typedef LONG(NTAPI* PFN_LdrRegisterDllNotification)(
+    ULONG Flags,
+    PFN_LdrDllNotification NotificationFunction,
+    PVOID Context,
+    PVOID* Cookie);
+
+typedef LONG(NTAPI* PFN_LdrUnregisterDllNotification)(PVOID Cookie);
+
+PFN_LdrRegisterDllNotification g_LdrRegister = 0;
+PFN_LdrUnregisterDllNotification g_LdrUnregister = 0;
+PVOID g_ldr_cookie = 0;
+
 }  // namespace
+
+/** single 模式：caller_path 子串匹配（大小写不敏感） */
+static int AllowBySubstr(const char* caller_path, void* arg) {
+  Stub* s = static_cast<Stub*>(arg);
+  if (!s || s->caller_path.empty()) {
+    return 1;
+  }
+  if (!caller_path) {
+    return 0;
+  }
+  std::string a(caller_path), b(s->caller_path);
+  for (size_t i = 0; i < a.size(); ++i) {
+    a[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(a[i])));
+  }
+  for (size_t i = 0; i < b.size(); ++i) {
+    b[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(b[i])));
+  }
+  return a.find(b) != std::string::npos ? 1 : 0;
+}
 
 class WinIatBackend;
 static WinIatBackend* g_win = 0;
@@ -69,12 +132,16 @@ static WinIatBackend* g_win = 0;
 class WinIatBackend : public Backend {
 public:
   const char* name() const {
-    return automatic_ ? "win_iat(auto)" : "win_iat";
+    if (!automatic_) {
+      return "win_iat";
+    }
+    return use_ldr_notify_ ? "win_iat(ldr)" : "win_iat(auto)";
   }
 
   int init(tray_hooks_mode_t mode) {
     mode_ = mode;
     automatic_ = (mode == TRAY_HOOKS_MODE_AUTOMATIC);
+    use_ldr_notify_ = false;
     g_win = this;
 
     if (automatic_) {
@@ -89,13 +156,16 @@ public:
         g_real_LLEW = reinterpret_cast<LoadLibraryExW_fn>(
             GetProcAddress(k32, "LoadLibraryExW"));
       }
-      // 先拿到真函数再改 IAT，避免代理内再走被改写的导入
       InstallLoaderHooks();
     }
     return TRAY_HOOKS_OK;
   }
 
   void uninit() {
+    if (g_ldr_cookie && g_LdrUnregister) {
+      g_LdrUnregister(g_ldr_cookie);
+      g_ldr_cookie = 0;
+    }
     std::lock_guard<std::mutex> lock(mu_);
     for (std::size_t i = 0; i < loader_patches_.size(); ++i) {
       iat::Restore(loader_patches_[i]);
@@ -119,11 +189,25 @@ public:
     const char* dll =
         stub->callee_path.empty() ? 0 : stub->callee_path.c_str();
 
+    // 组装 allow：partial 用回调；single 用 caller_path 子串
+    struct AllowCtx {
+      Stub* s;
+    } ctx;
+    ctx.s = stub;
+    int (*allow_fn)(const char*, void*) = 0;
+    void* allow_arg = 0;
+    if (stub->scope == 1 && stub->caller_allow) {
+      allow_fn = stub->caller_allow;
+      allow_arg = stub->caller_allow_arg;
+    } else if (stub->scope == 0 && !stub->caller_path.empty()) {
+      allow_fn = &AllowBySubstr;
+      allow_arg = stub;
+    }
+
     std::vector<iat::Patch> local;
     const int n = iat::PatchAllModules(dll, stub->sym_name.c_str(),
                                        stub->new_func, &local,
-                                       SkipModuleForPatch());
-    // prev 优先取 IAT 槽里改写前的地址（resolve_sym 对业务 DLL 导出常失败）
+                                       SkipModuleForPatch(), allow_fn, allow_arg);
     if (!local.empty() && local[0].original) {
       stub->prev_func = local[0].original;
     } else {
@@ -141,8 +225,9 @@ public:
 
     std::fprintf(stderr,
                  "[tray_hooks] win_iat: hooked '%s' in %d IAT slot(s) "
-                 "(prev=%p proxy=%p)\n",
-                 stub->sym_name.c_str(), n, stub->prev_func, stub->new_func);
+                 "(scope=%d prev=%p proxy=%p)\n",
+                 stub->sym_name.c_str(), n, stub->scope, stub->prev_func,
+                 stub->new_func);
     return stub;
   }
 
@@ -220,6 +305,18 @@ public:
       if (!s) {
         continue;
       }
+      char path_buf[MAX_PATH];
+      path_buf[0] = '\0';
+      GetModuleFileNameA(mod, path_buf, MAX_PATH);
+      if (s->scope == 1 && s->caller_allow) {
+        if (!s->caller_allow(path_buf, s->caller_allow_arg)) {
+          continue;
+        }
+      } else if (s->scope == 0 && !s->caller_path.empty()) {
+        if (!AllowBySubstr(path_buf, s)) {
+          continue;
+        }
+      }
       const char* dll = s->callee_path.empty() ? 0 : s->callee_path.c_str();
       std::vector<iat::Patch> local;
       total += iat::PatchModule(mod, dll, s->sym_name.c_str(), s->new_func,
@@ -243,6 +340,34 @@ public:
 
 private:
   void InstallLoaderHooks() {
+    // 首选 LdrRegisterDllNotification（Vista+），无 IAT hook LoadLibrary，避免 CRT 重入
+    HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+    if (ntdll) {
+      g_LdrRegister = reinterpret_cast<PFN_LdrRegisterDllNotification>(
+          GetProcAddress(ntdll, "LdrRegisterDllNotification"));
+      g_LdrUnregister = reinterpret_cast<PFN_LdrUnregisterDllNotification>(
+          GetProcAddress(ntdll, "LdrUnregisterDllNotification"));
+    }
+    if (g_LdrRegister) {
+      const LONG st =
+          g_LdrRegister(0, &LdrNotifyThunk, this, &g_ldr_cookie);
+      if (st >= 0 && g_ldr_cookie) {
+        use_ldr_notify_ = true;
+        std::fprintf(stderr,
+                     "[tray_hooks] win_iat: AUTOMATIC via "
+                     "LdrRegisterDllNotification\n");
+        return;
+      }
+    }
+
+    // 回退：IAT hook LoadLibrary*（可用 TRAY_HOOKS_IAT_LOADLIBRARY=1 强制）
+    const char* force = std::getenv("TRAY_HOOKS_IAT_LOADLIBRARY");
+    if (force && (*force == '0' || *force == 'n' || *force == 'N')) {
+      std::fprintf(stderr,
+                   "[tray_hooks] win_iat: LdrNotify unavailable and "
+                   "IAT LoadLibrary disabled\n");
+      return;
+    }
     HMODULE skip = SkipModuleForPatch();
     struct Item {
       const char* sym;
@@ -257,14 +382,25 @@ private:
     for (int i = 0; items[i].sym; ++i) {
       iat::PatchAllModules("kernel32.dll", items[i].sym, items[i].proxy,
                            &loader_patches_, skip);
-      // 部分进程从 api-ms-win-core-libraryloader-*.dll 导入
       iat::PatchAllModules(0, items[i].sym, items[i].proxy, &loader_patches_,
                            skip);
     }
     std::fprintf(stderr,
-                 "[tray_hooks] win_iat: AUTOMATIC loader hooks installed "
+                 "[tray_hooks] win_iat: AUTOMATIC fallback LoadLibrary IAT "
                  "(%zu patches)\n",
                  loader_patches_.size());
+  }
+
+  static VOID NTAPI LdrNotifyThunk(ULONG reason,
+                                   const TRAY_LDR_DLL_NOTIFICATION_DATA* data,
+                                   PVOID) {
+    if (reason != LDR_DLL_NOTIFICATION_REASON_LOADED || !data || !g_win) {
+      return;
+    }
+    HMODULE mod = reinterpret_cast<HMODULE>(data->Loaded.DllBase);
+    if (mod) {
+      g_win->OnModuleLoaded(mod);
+    }
   }
 
   static HMODULE WINAPI ProxyLoadLibraryA(LPCSTR name) {
@@ -302,6 +438,7 @@ private:
 
   tray_hooks_mode_t mode_;
   bool automatic_ = false;
+  bool use_ldr_notify_ = false;
   bool refreshing_ = false;
   std::mutex mu_;
   std::vector<iat::Patch> patches_;

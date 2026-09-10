@@ -1,0 +1,55 @@
+name: hooks-ci
+
+on:
+  push:
+    paths:
+      - "hooks/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/hooks-ci.yml"
+  pull_request:
+    paths:
+      - "hooks/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/hooks-ci.yml"
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DTRAY_DEMO_BUILD_HOOKS=ON \
+            -DTRAY_DEMO_BUILD_APP=OFF \
+            -DTRAY_HOOKS_BUILD_TESTS=ON \
+            -DTRAY_HOOKS_BUILD_MEMPROBE=ON
+      - name: Build
+        run: |
+          cmake --build build --target \
+            tray_hooks tray_memprobe \
+            hooks_unit_tests hooks_apm_tests hook_whitebox tray_wb_late \
+            -j$(nproc)
+      - name: Test
+        working-directory: build
+        run: ctest -R "hooks_|hook_whitebox" --output-on-failure
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: |
+          cmake -S . -B build `
+            -DTRAY_DEMO_BUILD_HOOKS=ON `
+            -DTRAY_DEMO_BUILD_APP=OFF `
+            -DTRAY_HOOKS_BUILD_TESTS=ON `
+            -DTRAY_HOOKS_BUILD_MEMPROBE=ON
+      - name: Build
+        run: |
+          cmake --build build --config Release --target `
+            tray_hooks tray_memprobe `
+            hooks_unit_tests hooks_apm_tests hook_whitebox tray_wb_late
+      - name: Test
+        working-directory: build
+        run: ctest -C Release -R "hooks_|hook_whitebox" --output-on-failure

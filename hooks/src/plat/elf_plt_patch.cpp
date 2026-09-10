@@ -21,6 +21,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include <cstdio>
 #include <cstring>
 #include <elf.h>
 
@@ -68,7 +69,10 @@ struct FindCtx {
   const char* sym_name;
   void* new_fn;
   std::vector<Patch>* out;
+  int (*allow)(const char*, void*);
+  void* allow_arg;
   int count;
+  int fails;
 };
 
 /** 放宽页保护以便写入 GOT；失败时再试 RXW */
@@ -104,16 +108,17 @@ const char* GetStr(const char* strtab, Elf_Sym* sym) {
 
 /** 处理单个已映射 ELF 的 PLT 重定位表 */
 void PatchOneElf(dl_phdr_info* info, FindCtx* ctx) {
-  if (!info || !info->dlpi_name) {
+  if (!info) {
+    return;
+  }
+  const char* path = info->dlpi_name ? info->dlpi_name : "";
+  if (ctx->allow && !ctx->allow(path, ctx->allow_arg)) {
     return;
   }
   // 可选：按路径子串过滤调用者（例如只 hook libfoo.so）
   if (ctx->caller_substr && *ctx->caller_substr) {
-    if (!std::strstr(info->dlpi_name, ctx->caller_substr) &&
-        !(info->dlpi_name[0] == '\0')) {
-      if (info->dlpi_name[0] != '\0') {
-        return;
-      }
+    if (path[0] != '\0' && !std::strstr(path, ctx->caller_substr)) {
+      return;
     }
   }
 
@@ -188,6 +193,7 @@ void PatchOneElf(dl_phdr_info* info, FindCtx* ctx) {
         continue;
       }
       if (!WriteSlot(slot, ctx->new_fn)) {
+        ctx->fails++;
         continue;
       }
       if (ctx->out) {
@@ -195,7 +201,7 @@ void PatchOneElf(dl_phdr_info* info, FindCtx* ctx) {
         p.slot = slot;
         p.original = original;
         p.replaced = ctx->new_fn;
-        p.caller_path = info->dlpi_name;
+        p.caller_path = info->dlpi_name ? info->dlpi_name : "";
         p.sym_name = ctx->sym_name;
         ctx->out->push_back(p);
       }
@@ -219,6 +225,7 @@ void PatchOneElf(dl_phdr_info* info, FindCtx* ctx) {
         continue;
       }
       if (!WriteSlot(slot, ctx->new_fn)) {
+        ctx->fails++;
         continue;
       }
       if (ctx->out) {
@@ -226,7 +233,7 @@ void PatchOneElf(dl_phdr_info* info, FindCtx* ctx) {
         p.slot = slot;
         p.original = original;
         p.replaced = ctx->new_fn;
-        p.caller_path = info->dlpi_name;
+        p.caller_path = info->dlpi_name ? info->dlpi_name : "";
         p.sym_name = ctx->sym_name;
         ctx->out->push_back(p);
       }
@@ -245,7 +252,10 @@ int PhdrCb(dl_phdr_info* info, size_t /*size*/, void* data) {
 int PatchSymbol(const char* caller_substr,
                 const char* sym_name,
                 void* new_fn,
-                std::vector<Patch>* out_patches) {
+                std::vector<Patch>* out_patches,
+                int (*allow)(const char* caller_path, void* arg),
+                void* allow_arg,
+                int* fail_out) {
   if (!sym_name || !*sym_name || !new_fn) {
     return 0;
   }
@@ -254,8 +264,20 @@ int PatchSymbol(const char* caller_substr,
   ctx.sym_name = sym_name;
   ctx.new_fn = new_fn;
   ctx.out = out_patches;
+  ctx.allow = allow;
+  ctx.allow_arg = allow_arg;
   ctx.count = 0;
+  ctx.fails = 0;
   dl_iterate_phdr(PhdrCb, &ctx);
+  if (fail_out) {
+    *fail_out = ctx.fails;
+  }
+  if (ctx.fails > 0) {
+    std::fprintf(stderr,
+                 "[tray_hooks] elf_plt: '%s' write failed on %d GOT slot(s) "
+                 "(RELRO/hardening?)\n",
+                 sym_name, ctx.fails);
+  }
   return ctx.count;
 }
 

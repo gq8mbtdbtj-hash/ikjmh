@@ -61,15 +61,9 @@
  *
  * @section roadmap 后续可做
  *
- * - hook_partial 真正按 caller_allow 过滤模块
- * - RELRO / 加固场景的 GOT 写入策略与失败上报
- * - Windows HTTPS APM（WinHTTP 已支持）；POSIX 可接 libcurl
- * - NPU 厂商 ABI 精确 hook（现需 domain_alloc）
- * - CI：矩阵编 Win/Linux/Android，跑 unit + whitebox
- * - 与 tray 主程序联动：托盘一键开始采集 / 导出报告
- *
- * @see hooks/docs/PLATFORM.md
- * @see hooks/memprobe/README.md
+ * 详见 hooks/docs/ROADMAP.md。已完成：hook_partial、CI、Delay-Load、
+ * NPU ACL 精确 hook、白盒晚加载、ELF 写失败上报。
+ * 仍可选：托盘菜单联动、POSIX HTTPS APM、backtrace LRU、Benchmark。
  */
 
 /**

@@ -37,16 +37,17 @@ struct Patch {
 
 /**
  * @brief 遍历已加载 ELF，改写对 sym_name 的 PLT GOT 槽。
- * @param caller_substr 仅处理 pathname 包含该子串的模块；NULL=全部
- * @param sym_name      如 "malloc" / "mmap"
- * @param new_fn        proxy
- * @param out_patches   可选，收集 Patch
- * @return 成功改写槽位数（同一符号可能在多个 so 各有一条）
+ * @param caller_substr 仅处理 pathname 包含该子串的模块；NULL=全部（可与 allow 并用）
+ * @param allow         可选回调；返回 0 跳过该 caller
+ * @param fail_out      可选；累计 WriteSlot 失败次数（RELRO/加固诊断）
  */
 int PatchSymbol(const char* caller_substr,
                 const char* sym_name,
                 void* new_fn,
-                std::vector<Patch>* out_patches);
+                std::vector<Patch>* out_patches,
+                int (*allow)(const char* caller_path, void* arg) = 0,
+                void* allow_arg = 0,
+                int* fail_out = 0);
 
 bool Restore(const Patch& p);
 

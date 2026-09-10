@@ -132,6 +132,7 @@ endif()
 
 option(TRAY_DEMO_BUILD_ABOUT_MODULE "Build about sample module" ON)
 option(TRAY_DEMO_BUILD_HOOKS "Build cross-platform tray_hooks library" ON)
+option(TRAY_DEMO_BUILD_MEMPROBE_MODULE "Tray menu for tray_memprobe" ON)
 
 # ---- Demo business module ----
 if(TRAY_DEMO_BUILD_DEMO_MODULE)
@@ -156,6 +157,14 @@ if(TRAY_DEMO_BUILD_HOOKS)
   add_subdirectory(hooks)
 endif()
 
+# ---- Memprobe 托盘联动（依赖 tray_memprobe）----
+if(TRAY_DEMO_BUILD_MEMPROBE_MODULE AND TARGET tray_memprobe)
+  add_library(tray_demo_module_memprobe
+    src/modules/memprobe/memprobe_module.cpp
+  )
+  target_link_libraries(tray_demo_module_memprobe PUBLIC tray_demo_core tray_memprobe)
+endif()
+
 if(TRAY_DEMO_BUILD_APP)
   if(WIN32)
     add_executable(tray_demo WIN32 src/app/main.cpp)
@@ -170,6 +179,15 @@ if(TRAY_DEMO_BUILD_APP)
   if(TRAY_DEMO_BUILD_ABOUT_MODULE)
     target_link_libraries(tray_demo PRIVATE tray_demo_module_about)
     target_compile_definitions(tray_demo PRIVATE TRAY_DEMO_HAS_ABOUT_MODULE=1)
+  endif()
+  if(TARGET tray_demo_module_memprobe)
+    target_link_libraries(tray_demo PRIVATE tray_demo_module_memprobe)
+    target_compile_definitions(tray_demo PRIVATE TRAY_DEMO_HAS_MEMPROBE_MODULE=1)
+    add_custom_command(TARGET tray_demo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:tray_memprobe>
+        $<TARGET_FILE_DIR:tray_demo>
+      COMMENT "Copy tray_memprobe next to tray_demo")
   endif()
   if(WIN32 AND DEFINED TRAY_DEMO_PTHREAD_DLL_PATH)
     add_custom_command(TARGET tray_demo POST_BUILD

@@ -7,12 +7,14 @@
 
 #pragma once
 
+#include "tray_hooks/memprobe.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /** 初始化 tray_hooks 并 hook malloc/mmap（及环境变量指定的 GPU/NPU 符号） */
-void tray_memprobe_install_hooks(void);
+TRAY_MEMPROBE_API void tray_memprobe_install_hooks(void);
 
 #ifdef __cplusplus
 }

@@ -55,14 +55,17 @@ int PatchModule(HMODULE caller,
                 std::vector<Patch>* out_patches);
 
 /**
- * @brief 枚举当前进程所有已加载模块并 PatchModule。
+ * @brief 枚举当前进程所有已加载模块并 PatchModule（含 Delay-Load 导入表）。
  * @param skip_self 跳过探针自身模块，避免改到自己的导入造成递归
+ * @param allow     可选；非空时对每个模块路径（UTF-8）回调，返回 0 则跳过
  */
 int PatchAllModules(const char* import_dll,
                     const char* sym_name,
                     void* new_fn,
                     std::vector<Patch>* out_patches,
-                    HMODULE skip_self);
+                    HMODULE skip_self,
+                    int (*allow)(const char* caller_path, void* arg) = 0,
+                    void* allow_arg = 0);
 
 /** @brief 把槽写回 original */
 bool Restore(const Patch& p);

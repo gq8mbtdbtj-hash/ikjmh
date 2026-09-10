@@ -114,6 +114,8 @@ extern "C" tray_hooks_stub_t* tray_hooks_hook_single(
   s->hooked = hooked;
   s->hooked_arg = hooked_arg;
   s->scope = 0;
+  s->caller_allow = 0;
+  s->caller_allow_arg = 0;
   return Install(s);
 }
 
@@ -125,12 +127,25 @@ extern "C" tray_hooks_stub_t* tray_hooks_hook_partial(
     void* new_func,
     tray_hooks_hooked_t hooked,
     void* hooked_arg) {
-  // 当前后端未实现 caller 过滤回调；行为等同 hook_all。
-  // CUSTOMIZE: 在 Backend::hook 内用 caller_allow 过滤模块。
-  (void)caller_allow;
-  (void)caller_allow_arg;
-  return tray_hooks_hook_all(callee_path, sym_name, new_func, hooked,
-                             hooked_arg);
+  if (!g_backend || !caller_allow || !new_func || !sym_name || !*sym_name) {
+    return 0;
+  }
+  tray_hooks::detail::Stub* s = new (std::nothrow) tray_hooks::detail::Stub();
+  if (!s) {
+    return 0;
+  }
+  if (callee_path) {
+    s->callee_path = callee_path;
+  }
+  s->sym_name = sym_name;
+  s->new_func = new_func;
+  s->prev_func = 0;
+  s->hooked = hooked;
+  s->hooked_arg = hooked_arg;
+  s->scope = 1;
+  s->caller_allow = caller_allow;
+  s->caller_allow_arg = caller_allow_arg;
+  return Install(s);
 }
 
 extern "C" tray_hooks_stub_t* tray_hooks_hook_all(
@@ -155,6 +170,8 @@ extern "C" tray_hooks_stub_t* tray_hooks_hook_all(
   s->hooked = hooked;
   s->hooked_arg = hooked_arg;
   s->scope = 2;
+  s->caller_allow = 0;
+  s->caller_allow_arg = 0;
   return Install(s);
 }
 

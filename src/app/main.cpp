@@ -16,6 +16,9 @@
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
 #include "tray_demo/modules/about/about_module.hpp"
 #endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+#include "tray_demo/modules/memprobe/memprobe_module.hpp"
+#endif
 
 #if defined(_WIN32)
 #include "tray_demo/platform/win/win_platform.hpp"
@@ -44,6 +47,10 @@ void RegisterBusinessModules(tray_demo::AppController& app
                              ,
                              tray_demo::modules::AboutModule* about
 #endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+                             ,
+                             tray_demo::modules::MemprobeModule* memprobe
+#endif
 ) {
 #if defined(TRAY_DEMO_HAS_DEMO_MODULE) && TRAY_DEMO_HAS_DEMO_MODULE
   if (demo) {
@@ -53,6 +60,11 @@ void RegisterBusinessModules(tray_demo::AppController& app
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
   if (about) {
     app.RegisterModule(about);
+  }
+#endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+  if (memprobe) {
+    app.RegisterModule(memprobe);
   }
 #endif
   (void)app;
@@ -85,6 +97,9 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
   modules::AboutModule about;
 #endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+  modules::MemprobeModule memprobe;
+#endif
 
   AppController app;
   PlatformServices services;
@@ -99,6 +114,10 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
                           ,
                           &about
+#endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+                          ,
+                          &memprobe
 #endif
   );
 
@@ -155,6 +174,9 @@ int main() {
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
   modules::AboutModule about;
 #endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+  modules::MemprobeModule memprobe;
+#endif
 
   AppController app;
   PlatformServices services;
@@ -169,6 +191,10 @@ int main() {
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
                           ,
                           &about
+#endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+                          ,
+                          &memprobe
 #endif
   );
 
@@ -201,6 +227,9 @@ int main() {
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
   modules::AboutModule about;
 #endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+  modules::MemprobeModule memprobe;
+#endif
 
   AppController app;
   PlatformServices services;
@@ -215,6 +244,10 @@ int main() {
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
                           ,
                           &about
+#endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+                          ,
+                          &memprobe
 #endif
   );
 
@@ -245,6 +278,9 @@ int main() {
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
   modules::AboutModule about;
 #endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+  modules::MemprobeModule memprobe;
+#endif
   AppController app;
   PlatformServices services;
   BindNullPlatform(&services, &tray, &menu, &panel, &auth);
@@ -258,6 +294,10 @@ int main() {
 #if defined(TRAY_DEMO_HAS_ABOUT_MODULE) && TRAY_DEMO_HAS_ABOUT_MODULE
                           ,
                           &about
+#endif
+#if defined(TRAY_DEMO_HAS_MEMPROBE_MODULE) && TRAY_DEMO_HAS_MEMPROBE_MODULE
+                          ,
+                          &memprobe
 #endif
   );
   BasicPage home("home", "Home");
