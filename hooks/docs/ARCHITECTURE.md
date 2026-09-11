@@ -250,4 +250,5 @@ Android 真机矩阵见 [ANDROID.md](ANDROID.md)。
 - [DATAFLOW.md](DATAFLOW.md) — 事件与记账数据流  
 - [PLATFORM.md](PLATFORM.md) — 平台实现步骤  
 - [ANDROID.md](ANDROID.md) — Android 落地  
+- [LEARNING.md](LEARNING.md) — 学习资料整理  
 - [ROADMAP.md](ROADMAP.md) — 演进与明确不做  

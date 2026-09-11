@@ -24,7 +24,7 @@
 | 项 | 状态 | 说明 |
 |----|------|------|
 | Doxygen | ✅ | `hooks/Doxyfile` + mainpage |
-| 架构设计文档集 | ✅ | INDEX / ARCHITECTURE / API / DATAFLOW / PLATFORM / ANDROID |
+| 架构设计文档集 | ✅ | INDEX / ARCHITECTURE / API / DATAFLOW / PLATFORM / ANDROID / LEARNING |
 | 白盒 | ✅ | hook_all + CALL_PREV + hook_partial |
 | Fuzz / Benchmark | ⏳ | FILTER_* 畸形串、热路径计时 |
 | Android CI 矩阵 | ⏳ | NDK 编包 + 模拟器/真机 whitebox |

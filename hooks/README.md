@@ -23,6 +23,7 @@
 | [docs/DATAFLOW.md](docs/DATAFLOW.md) | 事件 / 过滤 / APM / 记账数据流 |
 | [docs/PLATFORM.md](docs/PLATFORM.md) | ELF GOT / Win IAT / Backtrace 实现备忘 |
 | [docs/ANDROID.md](docs/ANDROID.md) | Android 落地、注入、量产与验收 |
+| [docs/LEARNING.md](docs/LEARNING.md) | 相关学习资料与推荐路径 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 演进与明确不做 |
 | [memprobe/README.md](memprobe/README.md) | 无编译注入探针 |
 

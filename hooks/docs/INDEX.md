@@ -9,6 +9,7 @@
 | [DATAFLOW.md](DATAFLOW.md) | 观测 / APM | Hook 命中 → 过滤 → sink / APM / memprobe 记账 |
 | [PLATFORM.md](PLATFORM.md) | 平台实现 | ELF GOT / Win IAT / Backtrace 步骤备忘 |
 | [ANDROID.md](ANDROID.md) | Android 落地 | NDK 构建、注入、量产建议、风险矩阵 |
+| [LEARNING.md](LEARNING.md) | 新人 / 排障 | ELF/PLT、ByteHook、linker、采栈等学习资料与路径 |
 | [ROADMAP.md](ROADMAP.md) | 维护者 | 已完成项与明确不做范围 |
 | [mainpage.dox](mainpage.dox) | Doxygen 首页 | 模块总览（生成 HTML 后可见） |
 
