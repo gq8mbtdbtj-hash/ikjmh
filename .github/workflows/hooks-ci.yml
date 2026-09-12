@@ -17,6 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libssl-dev openssl python3
       - name: Configure
         run: |
           cmake -S . -B build \
@@ -28,11 +32,13 @@ jobs:
         run: |
           cmake --build build --target \
             tray_hooks tray_memprobe \
-            hooks_unit_tests hooks_apm_tests hook_whitebox tray_wb_late \
+            hooks_unit_tests hooks_apm_tests hooks_apm_https_tests \
+            hooks_filter_fuzz_tests hooks_bench_tests \
+            hook_whitebox tray_wb_late \
             -j$(nproc)
       - name: Test
         working-directory: build
-        run: ctest -R "hooks_|hook_whitebox" --output-on-failure
+        run: ctest --test-dir hooks -R "hooks_|hook_whitebox" --output-on-failure
 
   windows:
     runs-on: windows-latest
@@ -49,7 +55,24 @@ jobs:
         run: |
           cmake --build build --config Release --target `
             tray_hooks tray_memprobe `
-            hooks_unit_tests hooks_apm_tests hook_whitebox tray_wb_late
+            hooks_unit_tests hooks_apm_tests hooks_apm_https_tests `
+            hooks_filter_fuzz_tests hooks_bench_tests `
+            hook_whitebox tray_wb_late
       - name: Test
         working-directory: build
-        run: ctest -C Release -R "hooks_|hook_whitebox" --output-on-failure
+        run: ctest --test-dir hooks -C Release -R "hooks_|hook_whitebox" --output-on-failure
+
+  android-ndk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26b
+          add-to-path: false
+      - name: Cross-build arm64-v8a + x86_64
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: ./hooks/scripts/build_android_ndk.sh arm64-v8a x86_64

@@ -163,15 +163,18 @@ static void* ProxyMalloc(size_t n) {
 | 环境变量 | 含义 | 默认 |
 |----------|------|------|
 | `TRAY_HOOKS_APM_FILE` | NDJSON 追加路径 | 无则不启文件 |
-| `TRAY_HOOKS_APM_URL` | HTTP POST 批次（`application/x-ndjson`） | 无 |
+| `TRAY_HOOKS_APM_URL` | HTTP(S) POST 批次（`application/x-ndjson`） | 无 |
 | `TRAY_HOOKS_APM_INTERVAL_MS` | 刷新间隔 | 2000 |
 | `TRAY_HOOKS_APM_BATCH` | 每批最大事件数 | 64 |
 | `TRAY_HOOKS_APM_STACKS` | `0`=不上报 frames | 开 |
+| `TRAY_HOOKS_APM_TLS_INSECURE` | `1`=跳过证书校验（仅调试） | 关 |
 
 `tray_hooks_apm_start` / `tray_hooks_apm_start_from_env` 会 **注册为 collector sink**（覆盖先前 `set_sink`）。  
 `tray_hooks_apm_emit_raw`：追加自定义 JSON 行（如 memprobe 周期统计）。
 
-POSIX URL 当前以 **HTTP** 为主；HTTPS 见 [ROADMAP.md](ROADMAP.md)。
+- **Win**：WinHTTP，http/https  
+- **POSIX**：http 始终可用；https 需链接 OpenSSL（`TRAY_HOOKS_USE_OPENSSL`，定义 `TRAY_HOOKS_HAVE_OPENSSL`）  
+- **Android NDK**：默认不链 OpenSSL，建议 `APM_FILE` 或旁路 agent
 
 ---
 

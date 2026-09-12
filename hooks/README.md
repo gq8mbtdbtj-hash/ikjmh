@@ -92,7 +92,8 @@ export ANDROID_NDK_HOME=/path/to/ndk
 ## 测试与 Doxygen
 
 ```bash
-cmake --build build --target hooks_unit_tests hooks_apm_tests hook_whitebox memprobe_smoke
+cmake --build build --target hooks_unit_tests hooks_apm_tests hooks_apm_https_tests \
+  hooks_filter_fuzz_tests hooks_bench_tests hook_whitebox memprobe_smoke
 ctest --test-dir build -R "hooks_|hook_whitebox" --output-on-failure
 
 cd hooks && doxygen Doxyfile
@@ -109,7 +110,7 @@ cd hooks && doxygen Doxyfile
 | Windows | **已自研** `win_iat_patch` |
 | 无编译采集 | 注入 `tray_memprobe`（见 [memprobe/README.md](memprobe/README.md)） |
 | GPU/NPU/NEON | 精确 ABI hook / 环境变量 / `tray_memprobe_domain_*` |
-| 持续观测 | `TRAY_HOOKS_APM_FILE` / `TRAY_HOOKS_APM_URL` |
+| 持续观测 | `TRAY_HOOKS_APM_FILE` / `TRAY_HOOKS_APM_URL`（POSIX HTTPS 需 OpenSSL） |
 | 降噪 | `TRAY_HOOKS_FILTER_*` |
 
 ## 合规说明

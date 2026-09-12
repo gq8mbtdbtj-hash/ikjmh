@@ -1,11 +1,12 @@
 /**
  * @file apm_sink.cpp
- * @brief Collector sink：缓冲 → NDJSON 文件 / HTTP POST，持续观测。
+ * @brief Collector sink：缓冲 → NDJSON 文件 / HTTP(S) POST，持续观测。
  */
 
 #include "tray_hooks/apm.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -26,9 +27,18 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#if defined(TRAY_HOOKS_HAVE_OPENSSL) && TRAY_HOOKS_HAVE_OPENSSL
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#endif
 #endif
 
 namespace {
+
+bool TlsInsecureEnv() {
+  const char* v = std::getenv("TRAY_HOOKS_APM_TLS_INSECURE");
+  return v && (*v == '1' || *v == 'y' || *v == 'Y' || *v == 't' || *v == 'T');
+}
 
 std::mutex g_mu;
 bool g_running = false;
@@ -114,7 +124,7 @@ bool HttpPostNdjson(const std::string& url, const std::string& body) {
   if (url.empty() || body.empty()) {
     return false;
   }
-  // 粗解析 http://host:port/path
+  // 粗解析 http(s)://host:port/path
   std::string u = url;
   bool https = false;
   if (u.find("https://") == 0) {
@@ -147,8 +157,7 @@ bool HttpPostNdjson(const std::string& url, const std::string& body) {
   if (!ses) {
     return false;
   }
-  HINTERNET con =
-      WinHttpConnect(ses, whost.c_str(), port, 0);
+  HINTERNET con = WinHttpConnect(ses, whost.c_str(), port, 0);
   if (!con) {
     WinHttpCloseHandle(ses);
     return false;
@@ -162,8 +171,14 @@ bool HttpPostNdjson(const std::string& url, const std::string& body) {
     WinHttpCloseHandle(ses);
     return false;
   }
-  const wchar_t* headers =
-      L"Content-Type: application/x-ndjson\r\n";
+  if (https && TlsInsecureEnv()) {
+    DWORD sec = SECURITY_FLAG_IGNORE_UNKNOWN_CA |
+                SECURITY_FLAG_IGNORE_CERT_DATE_INVALID |
+                SECURITY_FLAG_IGNORE_CERT_CN_INVALID |
+                SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE;
+    WinHttpSetOption(req, WINHTTP_OPTION_SECURITY_FLAGS, &sec, sizeof(sec));
+  }
+  const wchar_t* headers = L"Content-Type: application/x-ndjson\r\n";
   BOOL ok = WinHttpSendRequest(req, headers, (DWORD)-1L, (LPVOID)body.data(),
                                (DWORD)body.size(), (DWORD)body.size(), 0);
   if (ok) {
@@ -177,36 +192,36 @@ bool HttpPostNdjson(const std::string& url, const std::string& body) {
 
 #else
 
-bool HttpPostNdjson(const std::string& url, const std::string& body) {
-  if (url.empty() || body.empty()) {
-    return false;
-  }
+bool ParseHttpUrl(const std::string& url, bool* https, std::string* host,
+                  std::string* path, int* port) {
   std::string u = url;
-  if (u.find("http://") == 0) {
+  *https = false;
+  if (u.find("https://") == 0) {
+    *https = true;
+    u = u.substr(8);
+  } else if (u.find("http://") == 0) {
     u = u.substr(7);
-  } else if (u.find("https://") == 0) {
-    // 无 TLS 依赖：HTTPS 请用 FILE + 旁路 agent，或仅 http://
-    std::fprintf(stderr,
-                 "[tray_hooks_apm] HTTPS not supported on POSIX build; use "
-                 "TRAY_HOOKS_APM_FILE or http://\n");
+  } else {
     return false;
   }
-  std::string host;
-  std::string path = "/";
-  int port = 80;
+  *path = "/";
+  *port = *https ? 443 : 80;
   size_t slash = u.find('/');
   std::string hostport = slash == std::string::npos ? u : u.substr(0, slash);
   if (slash != std::string::npos) {
-    path = u.substr(slash);
+    *path = u.substr(slash);
   }
   size_t colon = hostport.find(':');
   if (colon != std::string::npos) {
-    host = hostport.substr(0, colon);
-    port = std::atoi(hostport.substr(colon + 1).c_str());
+    *host = hostport.substr(0, colon);
+    *port = std::atoi(hostport.substr(colon + 1).c_str());
   } else {
-    host = hostport;
+    *host = hostport;
   }
+  return !host->empty();
+}
 
+int TcpConnect(const std::string& host, int port) {
   struct addrinfo hints;
   std::memset(&hints, 0, sizeof(hints));
   hints.ai_socktype = SOCK_STREAM;
@@ -215,7 +230,7 @@ bool HttpPostNdjson(const std::string& url, const std::string& body) {
   char port_s[16];
   std::snprintf(port_s, sizeof(port_s), "%d", port);
   if (getaddrinfo(host.c_str(), port_s, &hints, &res) != 0 || !res) {
-    return false;
+    return -1;
   }
   int fd = -1;
   for (struct addrinfo* p = res; p; p = p->ai_next) {
@@ -230,6 +245,128 @@ bool HttpPostNdjson(const std::string& url, const std::string& body) {
     fd = -1;
   }
   freeaddrinfo(res);
+  return fd;
+}
+
+bool SendAll(int fd, const char* data, size_t len) {
+  size_t sent = 0;
+  while (sent < len) {
+    ssize_t n = send(fd, data + sent, len - sent, 0);
+    if (n <= 0) {
+      return false;
+    }
+    sent += static_cast<size_t>(n);
+  }
+  return true;
+}
+
+#if defined(TRAY_HOOKS_HAVE_OPENSSL) && TRAY_HOOKS_HAVE_OPENSSL
+
+bool SslSendAll(SSL* ssl, const char* data, size_t len) {
+  size_t sent = 0;
+  while (sent < len) {
+    int n = SSL_write(ssl, data + sent, static_cast<int>(len - sent));
+    if (n <= 0) {
+      return false;
+    }
+    sent += static_cast<size_t>(n);
+  }
+  return true;
+}
+
+bool HttpsPostNdjson(const std::string& host, int port, const std::string& path,
+                     const std::string& body) {
+  int fd = TcpConnect(host, port);
+  if (fd < 0) {
+    return false;
+  }
+
+  SSL_library_init();
+  SSL_load_error_strings();
+  OpenSSL_add_all_algorithms();
+
+  SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
+  if (!ctx) {
+    close(fd);
+    return false;
+  }
+  if (TlsInsecureEnv()) {
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, 0);
+  } else {
+    SSL_CTX_set_default_verify_paths(ctx);
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, 0);
+  }
+
+  SSL* ssl = SSL_new(ctx);
+  if (!ssl) {
+    SSL_CTX_free(ctx);
+    close(fd);
+    return false;
+  }
+  SSL_set_tlsext_host_name(ssl, host.c_str());
+  SSL_set_fd(ssl, fd);
+  if (SSL_connect(ssl) != 1) {
+    SSL_free(ssl);
+    SSL_CTX_free(ctx);
+    close(fd);
+    return false;
+  }
+  if (!TlsInsecureEnv()) {
+    long vr = SSL_get_verify_result(ssl);
+    if (vr != X509_V_OK) {
+      SSL_shutdown(ssl);
+      SSL_free(ssl);
+      SSL_CTX_free(ctx);
+      close(fd);
+      return false;
+    }
+  }
+
+  char hdr[512];
+  std::snprintf(hdr, sizeof(hdr),
+                "POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: "
+                "application/x-ndjson\r\nContent-Length: %zu\r\nConnection: "
+                "close\r\n\r\n",
+                path.c_str(), host.c_str(), body.size());
+  std::string req = std::string(hdr) + body;
+  bool ok = SslSendAll(ssl, req.data(), req.size());
+  if (ok) {
+    char tmp[256];
+    (void)SSL_read(ssl, tmp, sizeof(tmp));
+  }
+  SSL_shutdown(ssl);
+  SSL_free(ssl);
+  SSL_CTX_free(ctx);
+  close(fd);
+  return ok;
+}
+
+#endif  // TRAY_HOOKS_HAVE_OPENSSL
+
+bool HttpPostNdjson(const std::string& url, const std::string& body) {
+  if (url.empty() || body.empty()) {
+    return false;
+  }
+  bool https = false;
+  std::string host;
+  std::string path = "/";
+  int port = 80;
+  if (!ParseHttpUrl(url, &https, &host, &path, &port)) {
+    return false;
+  }
+
+  if (https) {
+#if defined(TRAY_HOOKS_HAVE_OPENSSL) && TRAY_HOOKS_HAVE_OPENSSL
+    return HttpsPostNdjson(host, port, path, body);
+#else
+    std::fprintf(stderr,
+                 "[tray_hooks_apm] HTTPS requires OpenSSL (rebuild with OpenSSL "
+                 "found); use TRAY_HOOKS_APM_FILE or http://\n");
+    return false;
+#endif
+  }
+
+  int fd = TcpConnect(host, port);
   if (fd < 0) {
     return false;
   }
@@ -241,16 +378,9 @@ bool HttpPostNdjson(const std::string& url, const std::string& body) {
                 "close\r\n\r\n",
                 path.c_str(), host.c_str(), body.size());
   std::string req = std::string(hdr) + body;
-  size_t sent = 0;
-  while (sent < req.size()) {
-    ssize_t n = send(fd, req.data() + sent, req.size() - sent, 0);
-    if (n <= 0) {
-      break;
-    }
-    sent += static_cast<size_t>(n);
-  }
+  bool ok = SendAll(fd, req.data(), req.size());
   close(fd);
-  return sent == req.size();
+  return ok;
 }
 
 #endif
