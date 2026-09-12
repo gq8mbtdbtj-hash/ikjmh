@@ -3,11 +3,24 @@
  *
  * @brief 跨平台无编译注入 Hook、调用栈、内存域采集与 APM 持续观测。
  *
+ * ## 设计文档（必读）
+ *
+ * | 文档 | 内容 |
+ * |------|------|
+ * | docs/INDEX.md | 文档索引 |
+ * | docs/ARCHITECTURE.md | 分层架构、模块边界、扩展点、生命周期 |
+ * | docs/API.md | C ABI 契约、调用顺序、线程模型 |
+ * | docs/DATAFLOW.md | Hook → filter → sink / APM / memprobe |
+ * | docs/PLATFORM.md | ELF GOT / Win IAT / Backtrace 实现备忘 |
+ * | docs/ANDROID.md | Android NDK、注入、量产与验收 |
+ * | docs/LEARNING.md | ELF/ByteHook/linker 等学习资料 |
+ * | docs/ROADMAP.md | 演进与明确不做 |
+ *
  * ## 模块总览
  *
  * | 模块 | 头文件 | 职责 |
  * |------|--------|------|
- * | Hook 门面 | @ref hooks.h | init / hook_all / get_prev（IAT 或 ELF GOT） |
+ * | Hook 门面 | @ref hooks.h | init / hook_* / get_prev（IAT 或 ELF GOT） |
  * | Backtrace | @ref backtrace.h | 跨平台采栈与格式化 |
  * | Collector | @ref collector.h | 事件汇聚 + **过滤降噪** |
  * | APM | @ref apm.h | NDJSON 落盘 / HTTP 批量上报 |
@@ -16,33 +29,36 @@
  * @section arch 架构
  *
  * @code{.unparsed}
- *   App / LD_PRELOAD / PE add-needed
+ *   App / LD_PRELOAD / PE add-needed / System.loadLibrary
  *            │
  *            ▼
- *   tray_memprobe (DllMain / constructor)
+ *   tray_memprobe (DllMain / constructor(101))
  *      ├─ tray_hooks_init(AUTOMATIC)
  *      ├─ IAT/PLT hook malloc/mmap/GPU…
  *      ├─ OnAlloc/OnFree 记账 + 可选 collector_record
  *      └─ APM sink（FILE/URL）+ 周期 stats
  * @endcode
  *
+ * 更完整的分层图见 docs/ARCHITECTURE.md。
+ *
  * @section platforms 平台后端
  *
- * - **Windows**：@ref tray_hooks::iat "win_iat_patch" — 改写调用者 IAT；
- *   AUTOMATIC 再 hook LoadLibrary* 对新模块补丁。
- * - **ELF**（Linux/Android/OHOS/QNX）：@ref tray_hooks::elfplt "elf_plt_patch" —
+ * - **Windows**：win_iat_patch — 改写调用者 IAT；
+ *   AUTOMATIC 优先 LdrRegisterDllNotification，回退 LoadLibrary*。
+ * - **ELF**（Linux/Android/OHOS/QNX）：elf_plt_patch —
  *   改写 JUMP_SLOT GOT；AUTOMATIC hook dlopen / android_dlopen_ext。
  *
- * @customize Android 量产可将 CreateBackend() 换成 bytehook，对外 C ABI 不变。
+ * @customize{Android 量产可将 CreateBackend() 换成 bytehook，对外 C ABI 不变。见 docs/ANDROID.md。}
  *
  * @section inject 无编译注入
  *
- * - Linux: `LD_PRELOAD=libtray_memprobe.so` 或 `hooks/scripts/inject_memprobe.sh`
+ * - Linux/Android: `LD_PRELOAD=libtray_memprobe.so` 或 `hooks/scripts/inject_memprobe.sh`
  * - Windows: 运行时注入，或 `hooks/scripts/inject_memprobe.ps1`（PE add-needed）
+ * - Android APK: 打入 `lib/<abi>/`，`System.loadLibrary("tray_memprobe")` / wrap.sh
  *
  * @section filter_apm 降噪与持续观测
  *
- * 过滤环境变量见 @ref collector.h ；APM 见 @ref apm.h 。
+ * 过滤环境变量见 @ref collector.h ；APM 见 @ref apm.h ；数据流见 docs/DATAFLOW.md。
  * 典型组合：
  * @code{.unparsed}
  * TRAY_MEMPROBE_COLLECT=1
@@ -55,20 +71,21 @@
  *
  * | 目标 | 说明 |
  * |------|------|
- * | `hooks_unit_tests` | collector 过滤 / API 冒烟（无外部测试框架） |
- * | `hook_whitebox` | 自建 victim DLL/SO，验证真 hook + CALL_PREV |
+ * | `hooks_unit_tests` | collector 过滤 / API 冒烟 |
+ * | `hooks_apm_tests` | APM 文件写出 |
+ * | `hook_whitebox` | 自建 victim SO/DLL，真 hook + CALL_PREV |
  * | `memprobe_smoke` | 分配统计冒烟 |
  *
  * @section roadmap 后续可做
  *
- * 详见 hooks/docs/ROADMAP.md。已完成：hook_partial、CI、Delay-Load、
- * NPU ACL 精确 hook、白盒晚加载、ELF 写失败上报。
- * 仍可选：托盘菜单联动、POSIX HTTPS APM、backtrace LRU、Benchmark。
+ * 详见 docs/ROADMAP.md。已完成：hook_partial、CI、Delay-Load、
+ * NPU ACL 精确 hook、白盒晚加载、ELF 写失败上报、架构设计文档集。
+ * 仍可选：POSIX HTTPS APM、backtrace LRU、Benchmark、Android CI 矩阵。
  */
 
 /**
  * @defgroup tray_hooks_api Hook 门面 API
- * @brief tray_hooks_init / hook_* / get_prev
+ * @brief tray_hooks_init / hook_* / get_prev / unhook
  */
 
 /**

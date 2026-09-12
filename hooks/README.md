@@ -2,26 +2,40 @@
 
 参考 [xhook](https://github.com/iqiyi/xHook) / [bhook (ByteHook)](https://github.com/bytedance/bhook) 的 **caller 侧 PLT/GOT 改写**思路，提供统一采集 API，覆盖：
 
-| 平台 | Hook 后端（规划） | Backtrace |
-|------|-------------------|-----------|
-| **Android** | ELF PLT/GOT（可对接 bytehook / xhook） | `_Unwind_Backtrace` / libunwind |
-| **Linux** | ELF PLT/GOT（`dl_iterate_phdr`） | `backtrace` / unwind |
+| 平台 | Hook 后端 | Backtrace |
+|------|-----------|-----------|
+| **Android** | 自研 ELF PLT/GOT（量产可对接 bytehook） | `_Unwind_Backtrace` / libunwind |
+| **Linux** | 自研 ELF PLT/GOT（`dl_iterate_phdr`） | `backtrace` / unwind |
 | **QNX** | ELF PLT/GOT（QNX ELF + `dl*`） | unwind / 手写 FP |
-| **鸿蒙 (OHOS)** | ELF PLT/GOT（与 Android 类似，注意 linker namespace） | unwind |
-| **Windows** | **IAT**（PE 导入表，对应 PLT 的 caller 侧） | `CaptureStackBackTrace` |
+| **鸿蒙 (OHOS)** | ELF PLT/GOT（注意 linker namespace） | unwind |
+| **Windows** | 自研 **IAT**（PE 导入表） | `CaptureStackBackTrace` |
 
-> 当前仓库交付：**统一 API + 采集器 + 可工作的 backtrace + 各平台后端桩**。  
-> 完整生产级 GOT/IAT 改写体量大、需按机型/加固验证；Android 生产建议直接链入 **bytehook**，本目录作为门面与多端采集统一层。
+> 当前交付：**统一 C ABI + collector/APM + 可工作 backtrace + 真 GOT/IAT 后端 + memprobe 注入**。  
+> Android 量产可在 `CreateBackend()` 换成 bytehook，业务代码无需改动。
 
-## 架构
+## 文档（架构 / 设计）
+
+| 文档 | 内容 |
+|------|------|
+| [docs/INDEX.md](docs/INDEX.md) | 文档索引 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 分层架构、模块边界、扩展点 |
+| [docs/API.md](docs/API.md) | C ABI 契约与调用顺序 |
+| [docs/DATAFLOW.md](docs/DATAFLOW.md) | 事件 / 过滤 / APM / 记账数据流 |
+| [docs/PLATFORM.md](docs/PLATFORM.md) | ELF GOT / Win IAT / Backtrace 实现备忘 |
+| [docs/ANDROID.md](docs/ANDROID.md) | Android 落地、注入、量产与验收 |
+| [docs/LEARNING.md](docs/LEARNING.md) | 相关学习资料与推荐路径 |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 演进与明确不做 |
+| [memprobe/README.md](memprobe/README.md) | 无编译注入探针 |
+
+## 架构（简图）
 
 ```text
           ┌─────────────────────────────┐
-          │  App / 埋点 / APM 模块       │
+          │  App / 埋点 / APM / 注入     │
           └─────────────┬───────────────┘
-                        │  tray_hooks_* API
+                        │  tray_hooks_* / tray_memprobe_*
           ┌─────────────▼───────────────┐
-          │  collector（事件 + 堆栈）    │
+          │  collector + apm + memprobe │
           └─────────────┬───────────────┘
                ┌────────┴────────┐
                ▼                 ▼
@@ -29,90 +43,80 @@
    elf_plt | win_iat     posix | win
 ```
 
-**与 bhook 对齐的概念：**
-
-- Hook **调用者**（caller）的 GOT/IAT，而不是改 callee 代码（非 inline hook）
-- `hook_single` / `hook_partial` / `hook_all`
-- Proxy 内可采 backtrace；`call_prev` 调用原符号
+**与 bhook 对齐：** hook **调用者** GOT/IAT；`hook_single` / `partial` / `all`；proxy 内 `TRAY_HOOKS_CALL_PREV`。
 
 ## 快速使用
 
 ```c
 #include "tray_hooks/hooks.h"
 #include "tray_hooks/collector.h"
+#include "tray_hooks/backtrace.h"
 
-static void* my_malloc(size_t n) {
+static void* ProxyMalloc(size_t n) {
   tray_hooks_frame_t frames[32];
   int nframes = tray_hooks_backtrace(frames, 32, 1);
   tray_hooks_collector_record("malloc", frames, nframes, (uint64_t)n);
-  return tray_hooks_call_prev(my_malloc, n); /* 桩后端可能直接调 libc */
+  typedef void* (*malloc_fn)(size_t);
+  return TRAY_HOOKS_CALL_PREV(ProxyMalloc, malloc_fn, n);
 }
 
 void setup(void) {
-  tray_hooks_init(TRAY_HOOKS_MODE_AUTO);
+  tray_hooks_init(TRAY_HOOKS_MODE_AUTOMATIC);
   tray_hooks_collector_set_sink(my_sink, NULL);
-  tray_hooks_hook_all(NULL, "malloc", (void*)my_malloc, NULL, NULL);
+  tray_hooks_hook_all(NULL, "malloc", (void*)ProxyMalloc, NULL, NULL);
 }
 ```
 
 ## 构建
 
-根 `CMakeLists.txt` 选项：
-
 ```bash
-cmake -S . -B build -DTRAY_DEMO_BUILD_HOOKS=ON
-cmake --build build --target tray_hooks
-# 可选示例
-cmake --build build --target tray_hooks_sample
+# 在仓库根目录
+cmake -S . -B build -DTRAY_HOOKS_BUILD=ON
+cmake --build build --target tray_hooks tray_memprobe -j
+
+# 或仅 hooks 子树
+cmake -S hooks -B build_hooks
+cmake --build build_hooks -j
 ```
 
 Android NDK：
 
 ```bash
-cmake -S hooks -B build_hooks \
-  -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
-  -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24
+export ANDROID_NDK_HOME=/path/to/ndk
+./hooks/scripts/build_android_ndk.sh           # 默认 arm64-v8a
+./hooks/scripts/build_android_ndk.sh x86_64    # 模拟器 ABI
 ```
 
-## 测试与文档
+详见 [docs/ANDROID.md](docs/ANDROID.md)（含 `android_ndk_smoke` 与 adb 运行说明）。
+
+## 测试与 Doxygen
 
 ```bash
-# 单元自测 + 白盒 hook
-cmake --build build --target hooks_unit_tests hooks_apm_tests hook_whitebox
+cmake --build build --target hooks_unit_tests hooks_apm_tests hook_whitebox memprobe_smoke
 ctest --test-dir build -R "hooks_|hook_whitebox" --output-on-failure
-# 或直接:
-./build/hooks/hooks_unit_tests
-./build/hooks/hooks_apm_tests
-./build/hooks/hook_whitebox
 
-# Doxygen（hooks 专用，含 mainpage / ROADMAP）
 cd hooks && doxygen Doxyfile
-# 输出: hooks/docs/doxygen/html/index.html
+# → hooks/docs/doxygen/html/index.html
 ```
 
-白盒程序 `hook_whitebox`：自建 `tray_wb_lib` 导出 `wb_target`，验证真 IAT/PLT 拦截、
-`CALL_PREV`、unhook 恢复与重复 hook 幂等。
-
-后续方向见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+白盒 `hook_whitebox`：自建 `tray_wb_lib`，验证真 IAT/PLT、`TRAY_HOOKS_CALL_PREV`、partial、晚加载。
 
 ## 对接生产后端
 
 | 目标 | 建议 |
 |------|------|
-| Android / Linux | **已自研** `elf_plt_patch`（不链 xhook/bhook） |
-| Windows | **已自研** `win_iat_patch` 真 IAT 改写 |
+| Android / Linux | **已自研** `elf_plt_patch`；量产可换 bytehook |
+| Windows | **已自研** `win_iat_patch` |
 | 无编译采集 | 注入 `tray_memprobe`（见 [memprobe/README.md](memprobe/README.md)） |
-| GPU/NPU/NEON | 精确 GPU hook / 环境变量 / `domain_alloc` |
-| 持续观测 | `tray_hooks/apm.h`：`TRAY_HOOKS_APM_FILE` / `URL` |
-| 降噪 | `TRAY_HOOKS_FILTER_TAGS|TIDS|MODULES|...` |
+| GPU/NPU/NEON | 精确 ABI hook / 环境变量 / `tray_memprobe_domain_*` |
+| 持续观测 | `TRAY_HOOKS_APM_FILE` / `TRAY_HOOKS_APM_URL` |
+| 降噪 | `TRAY_HOOKS_FILTER_*` |
 
 ## 合规说明
 
-本模块面向 **自有进程内的诊断 / APM / 崩溃分析**。请勿用于未授权注入第三方进程或绕过安全机制。
+面向 **自有进程内** 诊断 / APM / 崩溃分析。请勿用于未授权注入第三方进程或绕过安全机制。
 
-## tray_memprobe（堆栈 + 用量，可 patchelf / PE 注入）
-
-见 **[memprobe/README.md](memprobe/README.md)**。
+## tray_memprobe 快速注入
 
 ```bash
 cmake --build build --target tray_memprobe memprobe_smoke
@@ -120,9 +124,6 @@ LD_PRELOAD=$PWD/build/hooks/libtray_memprobe.so \
   TRAY_MEMPROBE_LOG=/tmp/memprobe.txt \
   ./build/hooks/memprobe_smoke
 
-# 持久注入 ELF：
 ./hooks/scripts/inject_memprobe.sh ./your_app
-
-# 持久注入 PE（Windows）：
-./hooks/scripts/inject_memprobe.ps1 -Target ./your_app.exe
+# Windows: ./hooks/scripts/inject_memprobe.ps1 -Target ./your_app.exe
 ```

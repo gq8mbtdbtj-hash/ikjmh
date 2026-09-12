@@ -1,5 +1,7 @@
 # tray_memprobe — 无编译注入采集
 
+设计文档：[ARCHITECTURE](../docs/ARCHITECTURE.md) · [DATAFLOW](../docs/DATAFLOW.md) · [ANDROID](../docs/ANDROID.md) · [API](../docs/API.md) · [LEARNING](../docs/LEARNING.md)
+
 ## 目标
 
 **不改业务工程、不参与其编译**，通过注入本仓库产出的动态库，采集：

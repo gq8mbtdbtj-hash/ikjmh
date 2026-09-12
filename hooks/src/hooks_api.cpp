@@ -2,12 +2,20 @@
  * @file hooks_api.cpp
  * @brief tray_hooks 对外 C API 实现（线程安全门面）。
  *
- * 职责：
- *   1. 懒创建平台 Backend（IAT / PLT）
- *   2. 维护 proxy → prev 映射，供 TRAY_HOOKS_CALL_PREV
- *   3. 把 hook_single / partial / all 统一转成 Stub 交给后端
+ * ## 职责
+ * 1. 懒创建平台 Backend（IAT / PLT）
+ * 2. 维护 proxy → prev 映射，供 `TRAY_HOOKS_CALL_PREV`
+ * 3. 把 hook_single / partial / all 统一转成 Stub 交给后端
  *
- * 不在此文件做 PE/ELF 解析；改写细节见 plat/*_patch.*。
+ * ## 不在本文件
+ * PE/ELF 解析与槽位改写；细节见 plat/*_patch.*。
+ *
+ * ## 线程与幂等
+ * - 全局 mutex 保护 backend 与 proxy 表
+ * - init 幂等；重复 hook 同一 proxy 时不覆盖已正确的 prev（防 CALL_PREV 死递归）
+ *
+ * @see docs/ARCHITECTURE.md
+ * @see docs/API.md
  */
 
 #include "tray_hooks/hooks.h"
