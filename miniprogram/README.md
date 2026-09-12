@@ -18,6 +18,14 @@
 | 今日与连续打卡 | 首页今日合计 + 连续记账天数 |
 | 明细 | 按日分组；长按删除 |
 | 统计 | 按月合计 + 分类占比 |
+| **运动轨迹** | 步行/跑步/骑行；前台 GPS 采点；地图折线；历史回放 |
+
+## 运动轨迹说明
+
+- 使用 `wx.startLocationUpdate` + `onLocationChange` 前台持续定位（GCJ-02）
+- 切到后台会自动暂停，回到前台可继续（真后台轨迹需微信额外资质）
+- 隐私：`app.json` 已声明 `getLocation` / `onLocationChange` / `startLocationUpdate`
+- 轨迹保存在本地 Storage；过长轨迹会稀疏采样以防爆仓
 
 ## 小票解析说明
 
@@ -34,8 +42,8 @@
 
 ```
 miniprogram/
-  pages/          # 今日 / 记一笔 / 拍小票 / 确认 / 明细 / 统计
-  utils/          # storage / ocr / format
+  pages/          # 今日 / 记一笔 / 拍小票 / 确认 / 明细 / 统计 / 运动
+  utils/          # storage / ocr / format / geo / workout
   cloudfunctions/ # OCR 云函数骨架
   assets/         # tab 图标
 ```
@@ -45,3 +53,5 @@ miniprogram/
 - 附近午餐收藏 + 今日随机
 - 导出 CSV
 - 多人账本
+- 运动后台持续定位（需开通）
+- 运动配速曲线 / 卡路里估算

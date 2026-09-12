@@ -1,8 +1,10 @@
 const storage = require('./utils/storage')
+const workout = require('./utils/workout')
 
 App({
   onLaunch() {
     storage.ensureReady()
+    workout.ensureReady()
     // 开通云开发后取消注释：
     // if (wx.cloud) {
     //   wx.cloud.init({ env: 'your-env-id', traceUser: true })

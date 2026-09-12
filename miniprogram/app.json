@@ -1,11 +1,14 @@
 {
   "pages": [
     "pages/index/index",
+    "pages/sport/sport",
+    "pages/records/records",
+    "pages/stats/stats",
     "pages/add/add",
     "pages/scan/scan",
     "pages/confirm/confirm",
-    "pages/records/records",
-    "pages/stats/stats"
+    "pages/sport-history/sport-history",
+    "pages/sport-detail/sport-detail"
   ],
   "window": {
     "navigationBarBackgroundColor": "#14201c",
@@ -33,6 +36,12 @@
         "selectedIconPath": "assets/tab-list-active.png"
       },
       {
+        "pagePath": "pages/sport/sport",
+        "text": "运动",
+        "iconPath": "assets/tab-sport.png",
+        "selectedIconPath": "assets/tab-sport-active.png"
+      },
+      {
         "pagePath": "pages/stats/stats",
         "text": "统计",
         "iconPath": "assets/tab-stats.png",
@@ -40,6 +49,16 @@
       }
     ]
   },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于记录步行/跑步/骑行轨迹"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation",
+    "onLocationChange",
+    "startLocationUpdate"
+  ],
   "style": "v2",
   "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents"

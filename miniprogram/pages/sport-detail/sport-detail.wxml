@@ -1,0 +1,37 @@
+<view class="page detail-page" wx:if="{{item}}">
+  <map
+    class="map"
+    latitude="{{latitude}}"
+    longitude="{{longitude}}"
+    scale="{{scale}}"
+    polyline="{{polyline}}"
+    markers="{{markers}}"
+    include-points="{{includePoints}}"
+  />
+
+  <view class="panel card">
+    <view class="row-between">
+      <text class="brand">{{typeName}}</text>
+      <text class="muted">{{timeText}}</text>
+    </view>
+    <view class="metrics row-between">
+      <view class="metric">
+        <view class="metric-val amount">{{distanceText}}</view>
+        <view class="muted">距离</view>
+      </view>
+      <view class="metric">
+        <view class="metric-val amount">{{durationText}}</view>
+        <view class="muted">用时</view>
+      </view>
+      <view class="metric">
+        <view class="metric-val amount">{{paceText}}</view>
+        <view class="muted">配速</view>
+      </view>
+    </view>
+    <view class="muted">轨迹点数 {{pointCount}}</view>
+    <button class="btn-ghost danger" bindtap="onDelete">删除记录</button>
+  </view>
+</view>
+<view class="page" wx:else>
+  <view class="card muted">记录不存在或已删除</view>
+</view>

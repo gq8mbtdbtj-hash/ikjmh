@@ -1,7 +1,7 @@
 <view class="page">
   <view class="hero card">
     <view class="brand hero-title">小票账本</view>
-    <view class="muted">拍一张小票，确认金额，记一笔就好</view>
+    <view class="muted">记账 · 小票 · 运动轨迹</view>
     <view class="hero-amount-wrap">
       <text class="muted">今日支出</text>
       <view class="amount hero-amount">{{todayAmountText}}</view>
@@ -9,6 +9,10 @@
     <view class="streak row">
       <text class="chip">连续记账 {{streak}} 天</text>
       <text class="muted" wx:if="{{streakTip}}">{{streakTip}}</text>
+    </view>
+    <view class="sport-line row-between">
+      <text class="muted">今日运动 {{sportDistanceText}}</text>
+      <text class="link" bindtap="goSport">去运动</text>
     </view>
   </view>
 

@@ -46,6 +46,8 @@
   margin-bottom: 4rpx;
 }
 
-.empty {
-  padding: 24rpx 0 8rpx;
+.sport-line {
+  margin-top: 20rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid var(--line);
 }

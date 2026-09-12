@@ -1,11 +1,14 @@
 const storage = require('../../utils/storage')
 const format = require('../../utils/format')
+const workout = require('../../utils/workout')
+const geo = require('../../utils/geo')
 
 Page({
   data: {
     todayAmountText: '¥0.00',
     streak: 0,
     streakTip: '',
+    sportDistanceText: '0 m',
     recent: []
   },
 
@@ -18,6 +21,7 @@ Page({
     const today = storage.todayStr()
     const sum = storage.sumByDate(today)
     const streak = storage.getStreak()
+    const sportM = workout.todayDistanceM(today)
     const recent = storage
       .listRecords()
       .slice(0, 5)
@@ -35,6 +39,7 @@ Page({
       todayAmountText: format.displayAmount(sum),
       streak: streak.count || 0,
       streakTip,
+      sportDistanceText: geo.formatDistance(sportM),
       recent
     })
   },
@@ -49,5 +54,9 @@ Page({
 
   goRecords() {
     wx.switchTab({ url: '/pages/records/records' })
+  },
+
+  goSport() {
+    wx.switchTab({ url: '/pages/sport/sport' })
   }
 })
