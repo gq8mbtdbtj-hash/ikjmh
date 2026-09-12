@@ -27,7 +27,8 @@
 | 架构设计文档集 | ✅ | INDEX / ARCHITECTURE / API / DATAFLOW / PLATFORM / ANDROID / LEARNING |
 | 白盒 | ✅ | hook_all + CALL_PREV + hook_partial |
 | Fuzz / Benchmark | ⏳ | FILTER_* 畸形串、热路径计时 |
-| Android CI 矩阵 | ⏳ | NDK 编包 + 模拟器/真机 whitebox |
+| Android CI 矩阵 | ⏳ | NDK 编包可先入 CI；模拟器/真机 whitebox 待补 |
+| android_ndk_smoke | ✅ | `scripts/build_android_ndk.sh` 交叉编译 + ELF 校验 |
 
 ## 明确不做
 

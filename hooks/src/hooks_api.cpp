@@ -8,7 +8,7 @@
  * 3. 把 hook_single / partial / all 统一转成 Stub 交给后端
  *
  * ## 不在本文件
- * PE/ELF 解析与槽位改写；细节见 `plat/*_patch.*`。
+ * PE/ELF 解析与槽位改写；细节见 plat/*_patch.*。
  *
  * ## 线程与幂等
  * - 全局 mutex 保护 backend 与 proxy 表

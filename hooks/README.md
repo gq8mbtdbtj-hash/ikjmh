@@ -82,13 +82,12 @@ cmake --build build_hooks -j
 Android NDK：
 
 ```bash
-cmake -S hooks -B build_hooks \
-  -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
-  -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24
-cmake --build build_hooks --target tray_hooks tray_memprobe
+export ANDROID_NDK_HOME=/path/to/ndk
+./hooks/scripts/build_android_ndk.sh           # 默认 arm64-v8a
+./hooks/scripts/build_android_ndk.sh x86_64    # 模拟器 ABI
 ```
 
-详见 [docs/ANDROID.md](docs/ANDROID.md)。
+详见 [docs/ANDROID.md](docs/ANDROID.md)（含 `android_ndk_smoke` 与 adb 运行说明）。
 
 ## 测试与 Doxygen
 

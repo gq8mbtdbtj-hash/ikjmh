@@ -36,8 +36,9 @@
 | `android_dlopen_ext` AUTOMATIC | ✅ |
 | `_Unwind_Backtrace` + `dladdr` | ✅ |
 | Memprobe `constructor(101)` 自启 | ✅ |
-| NDK CMake 说明 | ✅（`hooks/README.md`） |
-| CI 真机 / 模拟器矩阵 | ❌ 待补 |
+| NDK CMake 说明 | ✅（`hooks/README.md` + `scripts/build_android_ndk.sh`） |
+| `android_ndk_smoke` 交叉编译冒烟 | ✅ arm64-v8a / x86_64 编包 + ELF 头校验 |
+| CI 真机 / 模拟器矩阵 | ❌ 待补（可先把 NDK 编包接入 CI） |
 | bytehook 适配后端 | 📐 `CreateBackend()` 扩展点已预留 |
 
 ---
@@ -72,19 +73,61 @@ Linker namespace（App 隔离命名空间）下：
 
 ## 4. 构建
 
-### 4.1 NDK 交叉编译
+### 4.1 NDK 交叉编译（推荐脚本）
 
 ```bash
-cmake -S hooks -B build_hooks \
-  -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
-  -DANDROID_ABI=arm64-v8a \
-  -DANDROID_PLATFORM=android-24
-cmake --build build_hooks --target tray_hooks tray_memprobe
+export ANDROID_NDK_HOME=/path/to/android-ndk-r26b   # 含 build/cmake/android.toolchain.cmake
+./hooks/scripts/build_android_ndk.sh                # 默认 arm64-v8a
+./hooks/scripts/build_android_ndk.sh arm64-v8a x86_64
 ```
 
-建议 ABI：`arm64-v8a` 必做；`armeabi-v7a` 按产品矩阵。
+脚本会：
 
-### 4.2 链入业务 so
+1. 配置/编译 `tray_hooks`、`libtray_memprobe.so`、`libtray_wb_lib.so`、`android_ndk_smoke`
+2. 用 `llvm-readelf` 校验产物为对应 ABI 的 ELF
+
+产物目录：`build_android/<abi>/`（已在仓库 `.gitignore` 的 `/build_*/` 下）。
+
+手动等价命令：
+
+```bash
+cmake -S hooks -B build_android/arm64-v8a \
+  -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+  -DANDROID_ABI=arm64-v8a \
+  -DANDROID_PLATFORM=android-24 \
+  -DANDROID_STL=c++_static \
+  -DTRAY_HOOKS_BUILD_SAMPLE=OFF \
+  -DTRAY_HOOKS_BUILD_ANDROID_SMOKE=ON
+cmake --build build_android/arm64-v8a --target \
+  tray_hooks tray_memprobe android_ndk_smoke tray_wb_lib
+```
+
+建议 ABI：`arm64-v8a` 必做；`x86_64` 便于模拟器；`armeabi-v7a` 按产品矩阵。
+
+### 4.2 NDK Demo 冒烟（`android_ndk_smoke`）
+
+交叉编译产物是 **可执行文件 + victim so**，覆盖：
+
+| 检查项 | 期望 |
+|--------|------|
+| backend 名 | 含 `elf_plt(android` |
+| PLT hook `wb_target` | 调用返回值变为 proxy 结果（+2000） |
+| `CALL_PREV` | 原实现仍返回 +1000 |
+| collector | 至少 1 条 `wb_target` 事件 |
+
+**真机 / 模拟器运行：**
+
+```bash
+adb push build_android/arm64-v8a/android_ndk_smoke \
+         build_android/arm64-v8a/libtray_wb_lib.so /data/local/tmp/
+adb shell 'cd /data/local/tmp && chmod +x android_ndk_smoke && \
+           LD_LIBRARY_PATH=. ./android_ndk_smoke'
+# 期望输出末行：ANDROID_NDK_SMOKE ALL PASS
+```
+
+> 本环境冒烟门槛以 **NDK 交叉编译成功 + AArch64 ELF 头校验** 为准；真机跑通列入验收清单。
+
+### 4.3 链入业务 so
 
 ```cmake
 add_library(biz SHARED …)
@@ -153,7 +196,9 @@ BytehookBackend : Backend
 
 **验收清单：**
 
-- [ ] arm64 真机：等价 whitebox（自建 so 导出符号，验证 CALL_PREV）
+- [x] NDK 交叉编译：`./hooks/scripts/build_android_ndk.sh arm64-v8a` 产出 smoke + memprobe + wb_lib
+- [x] 产物 ABI：`llvm-readelf` 确认 AArch64（及可选 x86_64）
+- [ ] arm64 真机/模拟器：`adb` 跑 `android_ndk_smoke` 输出 `ALL PASS`
 - [ ] Debug APK：memprobe dump 非空，peak 随分配变化
 - [ ] 晚加载 so：AUTOMATIC 后出现 re-patched 日志
 - [ ] Release：记录 fails 与覆盖率
