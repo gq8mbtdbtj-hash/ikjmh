@@ -12,15 +12,17 @@
  * | 变量 | 含义 | 默认 |
  * |------|------|------|
  * | `TRAY_HOOKS_APM_FILE` | NDJSON 路径 | 无则不启文件 |
- * | `TRAY_HOOKS_APM_URL` | HTTP 端点 | 无 |
+ * | `TRAY_HOOKS_APM_URL` | HTTP(S) 端点 | 无 |
  * | `TRAY_HOOKS_APM_INTERVAL_MS` | 刷新间隔 | 2000 |
  * | `TRAY_HOOKS_APM_BATCH` | 每批最多事件 | 64 |
  * | `TRAY_HOOKS_APM_STACKS` | `0`=不上报 frames | 开 |
+ * | `TRAY_HOOKS_APM_TLS_INSECURE` | `1`=跳过证书校验（仅调试） | 关 |
  *
  * ## 使用注意
  * - start 会 **注册为 collector sink**（覆盖先前 `set_sink`）
  * - 建议先 `tray_hooks_collector_apply_env_filter()` 再 start
- * - POSIX 当前以 HTTP 为主；HTTPS 见 docs/ROADMAP.md
+ * - Win：WinHTTP 支持 http/https；POSIX：http 始终可用，https 需链接 OpenSSL
+ *   （`TRAY_HOOKS_HAVE_OPENSSL`；Android NDK 默认不链 OpenSSL）
  *
  * @see docs/DATAFLOW.md
  * @see test_apm_unit.cpp
@@ -37,7 +39,7 @@ extern "C" {
 /** @brief APM 启动配置；file_path 与 url 可只填其一 */
 typedef struct tray_hooks_apm_config {
   const char* file_path;     /**< NDJSON 路径，可为 NULL */
-  const char* url;           /**< HTTP 端点，可为 NULL */
+  const char* url;           /**< HTTP(S) 端点，可为 NULL */
   int interval_ms;           /**< <=0 用默认 2000 */
   int batch_max;             /**< <=0 用默认 64 */
   int include_stacks;        /**< 0=事件不含 frames */

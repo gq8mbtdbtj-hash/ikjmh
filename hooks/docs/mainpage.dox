@@ -73,14 +73,17 @@
  * |------|------|
  * | `hooks_unit_tests` | collector 过滤 / API 冒烟 |
  * | `hooks_apm_tests` | APM 文件写出 |
+ * | `hooks_apm_https_tests` | 本地自签 TLS POST（需 OpenSSL/WinHTTP） |
+ * | `hooks_filter_fuzz_tests` | FILTER_* 畸形串 |
+ * | `hooks_bench_tests` | collector/backtrace 热路径计时 |
  * | `hook_whitebox` | 自建 victim SO/DLL，真 hook + CALL_PREV |
  * | `memprobe_smoke` | 分配统计冒烟 |
  *
  * @section roadmap 后续可做
  *
- * 详见 docs/ROADMAP.md。已完成：hook_partial、CI、Delay-Load、
- * NPU ACL 精确 hook、白盒晚加载、ELF 写失败上报、架构设计文档集。
- * 仍可选：POSIX HTTPS APM、backtrace LRU、Benchmark、Android CI 矩阵。
+ * 详见 docs/ROADMAP.md。已完成：hook_partial、CI（含 Android NDK 编包）、
+ * Delay-Load、NPU ACL、白盒、POSIX HTTPS APM、Fuzz/Benchmark、架构文档。
+ * 仍可选：backtrace LRU、模拟器/真机 whitebox。
  */
 
 /**

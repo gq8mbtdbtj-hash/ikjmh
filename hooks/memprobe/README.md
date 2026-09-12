@@ -70,9 +70,10 @@ PE 持久依赖可用：
 | `TRAY_MEMPROBE_LOG` | dump 路径 |
 | `TRAY_MEMPROBE_COLLECT` | `1`=分配事件进 collector（配合 APM） |
 | `TRAY_HOOKS_APM_FILE` | NDJSON 持续落盘 |
-| `TRAY_HOOKS_APM_URL` | HTTP POST 批次上报 |
+| `TRAY_HOOKS_APM_URL` | HTTP(S) POST 批次上报 |
 | `TRAY_HOOKS_APM_INTERVAL_MS` | 刷新间隔 |
 | `TRAY_HOOKS_APM_STACKS` | `0`=上报不含栈 |
+| `TRAY_HOOKS_APM_TLS_INSECURE` | `1`=跳过 TLS 证书校验（调试） |
 | `TRAY_HOOKS_FILTER_TAGS` | tag 白名单（如 `malloc,mmap`） |
 | `TRAY_HOOKS_FILTER_DENY_TAGS` | tag 黑名单 |
 | `TRAY_HOOKS_FILTER_TIDS` | 线程 ID 白名单 |

@@ -131,6 +131,8 @@ else()
 endif()
 
 option(TRAY_DEMO_BUILD_ABOUT_MODULE "Build about sample module" ON)
+enable_testing()
+
 option(TRAY_DEMO_BUILD_HOOKS "Build cross-platform tray_hooks library" ON)
 option(TRAY_DEMO_BUILD_MEMPROBE_MODULE "Tray menu for tray_memprobe" ON)
 

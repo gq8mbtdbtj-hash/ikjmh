@@ -38,7 +38,7 @@
 | Memprobe `constructor(101)` 自启 | ✅ |
 | NDK CMake 说明 | ✅（`hooks/README.md` + `scripts/build_android_ndk.sh`） |
 | `android_ndk_smoke` 交叉编译冒烟 | ✅ arm64-v8a / x86_64 编包 + ELF 头校验 |
-| CI 真机 / 模拟器矩阵 | ❌ 待补（可先把 NDK 编包接入 CI） |
+| CI 真机 / 模拟器矩阵 | ⏳ 编包已入 CI（`android-ndk` job）；模拟器/真机 whitebox 待补 |
 | bytehook 适配后端 | 📐 `CreateBackend()` 扩展点已预留 |
 
 ---

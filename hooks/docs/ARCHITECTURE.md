@@ -228,6 +228,9 @@ CMake：
 |------|--------|
 | `hooks_unit_tests` | collector 过滤 / API 冒烟 |
 | `hooks_apm_tests` | APM 文件写出 |
+| `hooks_apm_https_tests` | HTTPS POST（OpenSSL / WinHTTP） |
+| `hooks_filter_fuzz_tests` | FILTER_* 畸形输入 |
+| `hooks_bench_tests` | 热路径 ns/op |
 | `hook_whitebox` | 真 IAT/PLT、CALL_PREV、partial、晚加载 |
 | `memprobe_smoke` | 分配统计 |
 | CI | `.github/workflows/hooks-ci.yml`（Linux + Windows） |
@@ -240,7 +243,7 @@ Android 真机矩阵见 [ANDROID.md](ANDROID.md)。
 
 - 仅用于 **自有进程** 诊断 / APM / 崩溃分析。
 - 不提供绕过加固、提权、跨进程未授权注入的指南或实现。
-- APM HTTP 默认可用于内网采集；生产应叠加鉴权与 TLS（POSIX HTTPS 见 ROADMAP）。
+- APM HTTP(S) 可用于内网/生产采集；生产请校验证书并叠加鉴权（POSIX 需 OpenSSL；调试可用 `TRAY_HOOKS_APM_TLS_INSECURE=1`）。
 
 ---
 

@@ -85,7 +85,7 @@ Event → JSON → 内存 batch 缓冲
   └─ tray_hooks_apm_flush / stop
         │
         ├─ 追加写入 TRAY_HOOKS_APM_FILE（每行一个 JSON）
-        └─ HTTP POST TRAY_HOOKS_APM_URL
+        └─ HTTP(S) POST TRAY_HOOKS_APM_URL
            Content-Type: application/x-ndjson
 ```
 
