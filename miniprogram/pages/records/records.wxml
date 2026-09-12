@@ -1,0 +1,33 @@
+<view class="page">
+  <view class="card head row-between">
+    <text class="brand">明细</text>
+    <text class="muted">共 {{count}} 笔</text>
+  </view>
+
+  <block wx:if="{{groups.length}}">
+    <view class="card" wx:for="{{groups}}" wx:key="date">
+      <view class="row-between day-head">
+        <text class="day">{{item.date}}</text>
+        <text class="amount">{{item.sumText}}</text>
+      </view>
+      <view
+        class="row-between item"
+        wx:for="{{item.items}}"
+        wx:for-item="row"
+        wx:key="id"
+        bindlongpress="onDelete"
+        data-id="{{row.id}}"
+      >
+        <view class="row">
+          <image wx:if="{{row.imagePath}}" class="thumb" src="{{row.imagePath}}" mode="aspectFill" />
+          <view>
+            <view class="title">{{row.merchant}}</view>
+            <view class="muted">{{row.categoryName}} · {{row.sourceLabel}}</view>
+          </view>
+        </view>
+        <view class="amount">-{{row.amountText}}</view>
+      </view>
+    </view>
+  </block>
+  <view class="card empty muted" wx:else>暂无明细。去拍一张小票吧。</view>
+</view>

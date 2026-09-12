@@ -1,0 +1,9 @@
+{
+  "name": "parseReceipt",
+  "description": "小票 OCR 解析（骨架：需自行接入腾讯云 OCR）",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
