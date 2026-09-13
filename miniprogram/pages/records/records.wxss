@@ -1,0 +1,29 @@
+.day-head {
+  margin-bottom: 8rpx;
+}
+
+.day {
+  font-weight: 600;
+}
+
+.item {
+  padding: 18rpx 0;
+  border-top: 1rpx solid var(--line);
+}
+
+.thumb {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 10rpx;
+  margin-right: 16rpx;
+  background: #f3f7f5;
+}
+
+.title {
+  font-size: 30rpx;
+}
+
+.empty {
+  text-align: center;
+  padding: 48rpx 20rpx;
+}

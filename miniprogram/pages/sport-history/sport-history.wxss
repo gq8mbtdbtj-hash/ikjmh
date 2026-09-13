@@ -1,0 +1,13 @@
+.item {
+  margin-bottom: 16rpx;
+}
+
+.title {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.empty {
+  text-align: center;
+  padding: 48rpx 20rpx;
+}

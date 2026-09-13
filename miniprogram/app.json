@@ -1,0 +1,59 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/records/records",
+    "pages/stats/stats",
+    "pages/add/add",
+    "pages/scan/scan",
+    "pages/confirm/confirm",
+    "pages/sport/sport",
+    "pages/sport-history/sport-history",
+    "pages/sport-detail/sport-detail"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#14201c",
+    "navigationBarTitleText": "小票账本",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#e8eeec",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#5c6b66",
+    "selectedColor": "#0f766e",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "今日",
+        "iconPath": "assets/tab-home.png",
+        "selectedIconPath": "assets/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/records/records",
+        "text": "明细",
+        "iconPath": "assets/tab-list.png",
+        "selectedIconPath": "assets/tab-list-active.png"
+      },
+      {
+        "pagePath": "pages/stats/stats",
+        "text": "统计",
+        "iconPath": "assets/tab-stats.png",
+        "selectedIconPath": "assets/tab-stats-active.png"
+      }
+    ]
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于记录步行/跑步/骑行轨迹"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation",
+    "onLocationChange",
+    "startLocationUpdate"
+  ],
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

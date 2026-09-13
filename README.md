@@ -105,3 +105,7 @@ cmake --build build --target tray_memprobe
 LD_PRELOAD=./build/hooks/libtray_memprobe.so ./build/hooks/memprobe_smoke
 ./hooks/scripts/inject_memprobe.sh ./app   # patchelf --add-needed
 ```
+
+## 小票账本（微信小程序）
+
+独立目录 [`miniprogram/`](miniprogram/)。用微信开发者工具打开该目录即可预览：拍小票入账、手动记账、明细与月统计。详见 [miniprogram/README.md](miniprogram/README.md)。

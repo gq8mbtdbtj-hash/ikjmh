@@ -1,0 +1,9 @@
+{
+  "desc": "小票账本 sitemap",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
+}

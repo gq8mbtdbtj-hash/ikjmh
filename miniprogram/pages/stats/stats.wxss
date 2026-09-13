@@ -1,0 +1,36 @@
+.month {
+  font-size: 36rpx;
+}
+
+.total {
+  font-size: 56rpx;
+  margin: 20rpx 0 4rpx;
+}
+
+.section-title {
+  font-weight: 600;
+  margin-bottom: 20rpx;
+}
+
+.cat-row {
+  margin-bottom: 20rpx;
+}
+
+.bar-track {
+  margin-top: 10rpx;
+  height: 12rpx;
+  background: #e7efec;
+  border-radius: 999rpx;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #14b8a6, #0f766e);
+  border-radius: 999rpx;
+}
+
+.streak {
+  font-size: 48rpx;
+  margin-bottom: 8rpx;
+}

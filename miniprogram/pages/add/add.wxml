@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="card">
+    <view class="label">金额（元）</view>
+    <input class="input" type="digit" placeholder="0.00" value="{{amount}}" bindinput="onAmount" />
+
+    <view class="label">商户</view>
+    <input class="input" placeholder="例如：楼下咖啡" value="{{merchant}}" bindinput="onMerchant" />
+
+    <view class="label">分类</view>
+    <view class="cats">
+      <view
+        wx:for="{{categories}}"
+        wx:key="id"
+        class="cat {{category===item.id?'on':''}}"
+        data-id="{{item.id}}"
+        bindtap="onCat"
+      >{{item.name}}</view>
+    </view>
+
+    <view class="label">日期</view>
+    <picker mode="date" value="{{date}}" bindchange="onDate">
+      <view class="picker">{{date}}</view>
+    </picker>
+
+    <view class="label">备注</view>
+    <input class="input" placeholder="可选" value="{{note}}" bindinput="onNote" />
+  </view>
+
+  <button class="btn-primary save" bindtap="onSave">保存</button>
+</view>

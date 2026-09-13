@@ -1,0 +1,57 @@
+<view class="page sport-page">
+  <map
+    id="sportMap"
+    class="map"
+    latitude="{{latitude}}"
+    longitude="{{longitude}}"
+    scale="{{scale}}"
+    show-location
+    polyline="{{polyline}}"
+    markers="{{markers}}"
+  />
+
+  <view class="panel card">
+    <view class="types">
+      <view
+        wx:for="{{types}}"
+        wx:key="id"
+        class="type {{sportType===item.id?'on':''}} {{tracking?'disabled':''}}"
+        data-id="{{item.id}}"
+        bindtap="onType"
+      >{{item.name}}</view>
+    </view>
+
+    <view class="metrics row-between">
+      <view class="metric">
+        <view class="metric-val amount">{{distanceText}}</view>
+        <view class="muted">距离</view>
+      </view>
+      <view class="metric">
+        <view class="metric-val amount">{{durationText}}</view>
+        <view class="muted">用时</view>
+      </view>
+      <view class="metric">
+        <view class="metric-val amount">{{paceText}}</view>
+        <view class="muted">配速</view>
+      </view>
+    </view>
+
+    <view class="muted tip" wx:if="{{!tracking}}">前台持续定位记录轨迹；切后台会自动暂停。真·后台轨迹需微信额外开通。</view>
+    <view class="muted tip warn" wx:if="{{locError}}">{{locError}}</view>
+
+    <view class="actions" wx:if="{{!tracking && !paused}}">
+      <button class="btn-primary" bindtap="onStart">开始运动</button>
+      <button class="btn-ghost" bindtap="goHistory">历史轨迹</button>
+    </view>
+
+    <view class="actions" wx:if="{{tracking}}">
+      <button class="btn-ghost" bindtap="onPause">暂停</button>
+      <button class="btn-primary stop" bindtap="onStop">结束并保存</button>
+    </view>
+
+    <view class="actions" wx:if="{{paused && !tracking}}">
+      <button class="btn-primary" bindtap="onResume">继续</button>
+      <button class="btn-ghost stop" bindtap="onStop">结束并保存</button>
+    </view>
+  </view>
+</view>

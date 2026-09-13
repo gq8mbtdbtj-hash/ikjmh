@@ -1,0 +1,34 @@
+<view class="page">
+  <view class="card">
+    <view class="row-between">
+      <picker mode="date" fields="month" value="{{month}}" bindchange="onMonth">
+        <view class="brand month">{{month}}</view>
+      </picker>
+      <text class="muted">{{count}} 笔</text>
+    </view>
+    <view class="total amount">{{totalText}}</view>
+    <view class="muted">本月合计</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">分类占比</view>
+    <block wx:if="{{cats.length}}">
+      <view class="cat-row" wx:for="{{cats}}" wx:key="id">
+        <view class="row-between">
+          <text>{{item.name}}</text>
+          <text class="amount">{{item.amountText}}</text>
+        </view>
+        <view class="bar-track">
+          <view class="bar-fill" style="width: {{item.pct}}%;"></view>
+        </view>
+      </view>
+    </block>
+    <view class="muted" wx:else>本月暂无分类数据</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">连续打卡</view>
+    <view class="streak amount">{{streak}} 天</view>
+    <view class="muted">有记账的自然日会累计连续天数</view>
+  </view>
+</view>

@@ -107,6 +107,11 @@ $RECYCLE.BIN/
 secrets.*
 credentials.*
 
+# ---- 微信小程序 ----
+miniprogram/node_modules/
+miniprogram/**/node_modules/
+miniprogram/project.private.config.json
+
 # ---- 杂项 ----
 *.log
 *.tmp

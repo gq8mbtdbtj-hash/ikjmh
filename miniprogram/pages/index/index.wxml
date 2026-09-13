@@ -1,0 +1,40 @@
+<view class="page">
+  <view class="hero card">
+    <view class="brand hero-title">小票账本</view>
+    <view class="muted">拍小票，记清楚每一笔</view>
+    <view class="hero-amount-wrap">
+      <text class="muted">今日支出</text>
+      <view class="amount hero-amount">{{todayAmountText}}</view>
+    </view>
+    <view class="streak row">
+      <text class="chip">连续记账 {{streak}} 天</text>
+      <text class="muted" wx:if="{{streakTip}}">{{streakTip}}</text>
+    </view>
+    <view class="sport-line row-between">
+      <text class="muted">今日运动 {{sportDistanceText}}</text>
+      <text class="link" bindtap="goSport">去运动</text>
+    </view>
+  </view>
+
+  <view class="actions row-between">
+    <button class="btn-primary action" bindtap="goScan">拍小票入账</button>
+    <button class="btn-ghost action" bindtap="goAdd">手动记一笔</button>
+  </view>
+
+  <view class="card">
+    <view class="row-between section-head">
+      <text class="section-title">最近记录</text>
+      <text class="link" bindtap="goRecords">全部明细</text>
+    </view>
+    <block wx:if="{{recent.length}}">
+      <view class="item row-between" wx:for="{{recent}}" wx:key="id">
+        <view>
+          <view class="item-title">{{item.merchant}}</view>
+          <view class="muted">{{item.date}} · {{item.categoryName}}</view>
+        </view>
+        <view class="amount">-{{item.amountText}}</view>
+      </view>
+    </block>
+    <view class="empty muted" wx:else>还没有记录。拍张小票开始吧。</view>
+  </view>
+</view>
