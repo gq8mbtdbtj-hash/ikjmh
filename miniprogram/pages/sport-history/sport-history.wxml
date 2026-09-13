@@ -20,5 +20,5 @@
       <view class="muted">{{item.timeText}} · {{item.durationText}} · 配速 {{item.paceText}}</view>
     </view>
   </block>
-  <view class="card empty muted" wx:else>还没有运动记录。去「运动」页开始吧。</view>
+  <view class="card empty muted" wx:else>还没有运动记录。从首页「去运动」开始吧。</view>
 </view>
