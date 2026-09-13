@@ -57,6 +57,6 @@ Page({
   },
 
   goSport() {
-    wx.switchTab({ url: '/pages/sport/sport' })
+    wx.navigateTo({ url: '/pages/sport/sport' })
   }
 })

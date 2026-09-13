@@ -1,12 +1,12 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/sport/sport",
     "pages/records/records",
     "pages/stats/stats",
     "pages/add/add",
     "pages/scan/scan",
     "pages/confirm/confirm",
+    "pages/sport/sport",
     "pages/sport-history/sport-history",
     "pages/sport-detail/sport-detail"
   ],
@@ -34,12 +34,6 @@
         "text": "明细",
         "iconPath": "assets/tab-list.png",
         "selectedIconPath": "assets/tab-list-active.png"
-      },
-      {
-        "pagePath": "pages/sport/sport",
-        "text": "运动",
-        "iconPath": "assets/tab-sport.png",
-        "selectedIconPath": "assets/tab-sport-active.png"
       },
       {
         "pagePath": "pages/stats/stats",

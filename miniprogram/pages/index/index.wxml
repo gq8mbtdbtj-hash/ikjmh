@@ -1,7 +1,7 @@
 <view class="page">
   <view class="hero card">
     <view class="brand hero-title">小票账本</view>
-    <view class="muted">记账 · 小票 · 运动轨迹</view>
+    <view class="muted">拍小票，记清楚每一笔</view>
     <view class="hero-amount-wrap">
       <text class="muted">今日支出</text>
       <view class="amount hero-amount">{{todayAmountText}}</view>
